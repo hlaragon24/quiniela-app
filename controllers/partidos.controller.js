@@ -1,68 +1,91 @@
-const crearPartidosLote = async (req, res) => {
+const db = require("../data/database");
 
+const obtenerPartidosPorJornada = async (req, res) => {
+    try {
+        const { jornadaId } = req.params;
+
+        const resultado = await db.query(
+            "SELECT * FROM partidos WHERE jornada_id = $1 ORDER BY id",
+            [jornadaId]
+        );
+
+        res.json(resultado.rows);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            mensaje: "Error al obtener partidos"
+        });
+    }
+};
+
+
+const crearPartido = async (req, res) => {
+    try {
+        const {
+            jornada_id,
+            local,
+            visitante,
+            fecha,
+            es_comodin
+        } = req.body;
+
+        const resultado = await db.query(
+            `
+            INSERT INTO partidos
+            (jornada_id, local, visitante, fecha, es_comodin)
+            VALUES ($1,$2,$3,$4,$5)
+            RETURNING *
+            `,
+            [jornada_id, local, visitante, fecha, es_comodin]
+        );
+
+        res.json(resultado.rows[0]);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            mensaje: "Error al crear partido"
+        });
+    }
+};
+
+
+const crearPartidosLote = async (req, res) => {
     try {
 
-        const { jornada_id, partidos } = req.body;
+        const partidos = req.body;
 
-        if (!jornada_id || !partidos || partidos.length === 0) {
+        for (let partido of partidos) {
 
-            return res.status(400).json({
-                mensaje: "Datos incompletos"
-            });
-
+            await db.query(
+                `
+                INSERT INTO partidos
+                (jornada_id, local, visitante, fecha, es_comodin)
+                VALUES ($1,$2,$3,$4,$5)
+                `,
+                [
+                    partido.jornada_id,
+                    partido.local,
+                    partido.visitante,
+                    partido.fecha,
+                    partido.es_comodin
+                ]
+            );
         }
 
-        const values = [];
-
-        const placeholders = partidos.map((p, index) => {
-
-            const baseIndex = index * 5;
-
-            values.push(
-                jornada_id,
-                p.local,
-                p.visitante,
-                p.fecha,
-                p.es_comodin ?? false
-            );
-
-            return `($${baseIndex + 1},$${baseIndex + 2},$${baseIndex + 3},$${baseIndex + 4},$${baseIndex + 5})`;
-
-        });
-
-        const query = `
-            INSERT INTO partidos
-            (
-                jornada_id,
-                local,
-                visitante,
-                fecha,
-                es_comodin
-            )
-            VALUES
-            ${placeholders.join(",")}
-            RETURNING *
-        `;
-
-        const nuevosPartidos = await pool.query(query, values);
-
         res.json({
-            mensaje: "Partidos creados correctamente",
-            total: nuevosPartidos.rows.length,
-            data: nuevosPartidos.rows
+            mensaje: "Partidos creados correctamente"
         });
 
     } catch (error) {
-
         console.error(error);
-
         res.status(500).json({
-            mensaje: "Error creando partidos en lote"
+            mensaje: "Error al crear partidos en lote"
         });
-
     }
-
 };
+
 
 module.exports = {
     obtenerPartidosPorJornada,
