@@ -15,4 +15,10 @@ router.post(
     controller.guardarPronostico
 );
 
+router.get(
+  "/usuario",
+  authMiddleware,
+  controller.obtenerPronosticosUsuario
+);
+
 module.exports = router;
