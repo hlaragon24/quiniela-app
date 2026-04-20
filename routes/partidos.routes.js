@@ -24,7 +24,7 @@ router.post(
 router.post(
     "/lote",
     authMiddleware,
-    validarAdmin,
+    validarAdmin,  
     controller.crearPartidosLote
 );
 module.exports = router;
