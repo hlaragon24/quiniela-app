@@ -1,4 +1,4 @@
-const db = require("../data/database");
+const db = require("../config/database");
 
 console.log("TIPO DB:", typeof db);
 console.log("DB:", db);

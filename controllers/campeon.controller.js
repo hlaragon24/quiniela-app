@@ -1,5 +1,5 @@
-const { campeonesPronosticados } = require("../data/campeon");
-const { pronosticos } = require("../data/database");
+const { campeonesPronosticados } = require("../config/campeon");
+const { pronosticos } = require("../config/database");
 
 let campeonReal = null;
 

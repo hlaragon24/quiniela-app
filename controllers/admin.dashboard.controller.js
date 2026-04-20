@@ -1,4 +1,4 @@
-const pool = require("../data/database");
+const pool = require("../config/database");
 
 const resumenAdmin = async (req, res) => {
 
