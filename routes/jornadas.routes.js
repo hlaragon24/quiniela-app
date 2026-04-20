@@ -22,4 +22,9 @@ router.post(
     controller.crearJornada
 );
 
+router.get(
+  "/:numero/estado",
+  controller.obtenerEstadoJornada
+);
+
 module.exports = router;

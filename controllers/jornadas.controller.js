@@ -72,7 +72,53 @@ const obtenerJornadas = async (req, res) => {
 
 };
 
+const obtenerEstadoJornada = async (req, res) => {
+
+  try {
+
+    const { numero } = req.params;
+
+    const resultado = await pool.query(
+      `
+      SELECT fecha_cierre
+      FROM jornadas
+      WHERE numero = $1
+      `,
+      [numero]
+    );
+
+    if (resultado.rows.length === 0) {
+
+      return res.status(404).json({
+        mensaje: "Jornada no encontrada"
+      });
+
+    }
+
+    const fechaCierre = new Date(
+      resultado.rows[0].fecha_cierre
+    );
+
+    const ahora = new Date();
+
+    res.json({
+      abierta: ahora < fechaCierre
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      mensaje: "Error consultando estado jornada"
+    });
+
+  }
+
+};
+
 module.exports = {
     crearJornada,
-    obtenerJornadas
+    obtenerJornadas,
+    obtenerEstadoJornada
 };
