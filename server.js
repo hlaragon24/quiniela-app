@@ -1,7 +1,9 @@
 const express = require("express");
+const cors = require("cors");
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 
 
@@ -16,22 +18,18 @@ const jornadasRoutes = require("./routes/jornadas.routes");
 const adminRoutes = require("./routes/admin.routes");
 
 
-
-//console.log("resultadosRoutes =", resultadosRoutes);
-
-
-// Registrar rutas en Express
+// Registrar rutas
 app.use("/partidos", partidosRoutes);
 app.use("/pronosticos", pronosticosRoutes);
 app.use("/resultados", resultadosRoutes);
 app.use("/ranking", rankingRoutes);
 app.use("/auth", authRoutes);
 app.use("/campeon", campeonRoutes);
-app.use("/ranking", rankingRoutes);
 app.use("/jornadas", jornadasRoutes);
 app.use("/admin", adminRoutes);
 
-// Ruta base de prueba
+
+// Ruta base
 app.get("/", (req, res) => {
     res.send("Servidor funcionando 🚀 Quiniela App activa");
 });
@@ -40,7 +38,6 @@ app.get("/", (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 
-// Levantar servidor
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
