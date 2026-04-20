@@ -1,5 +1,8 @@
 const db = require("../data/database");
 
+console.log("TIPO DB:", typeof db);
+console.log("DB:", db);
+
 const obtenerPartidosPorJornada = async (req, res) => {
     try {
         const { jornadaId } = req.params;
