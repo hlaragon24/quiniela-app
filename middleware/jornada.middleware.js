@@ -23,26 +23,32 @@ const validarJornadaAbierta = async (req, res, next) => {
 
         }
 
-        const jornada_id = partido.rows[0].jornada_id;
+        const jornadaNumero = partido.rows[0].jornada_id;
 
-        const primerPartido = await pool.query(
+        const jornada = await pool.query(
             `
-            SELECT MIN(fecha) AS fecha_inicio
-            FROM partidos
-            WHERE jornada_id = $1
+            SELECT fecha_cierre
+            FROM jornadas
+            WHERE numero = $1
             `,
-            [jornada_id]
+            [jornadaNumero]
         );
 
-        const fechaInicio = new Date(primerPartido.rows[0].fecha_inicio);
+        if (jornada.rows.length === 0) {
 
-        const fechaBloqueo = new Date(fechaInicio);
+            return res.status(404).json({
+                mensaje: "Jornada no configurada"
+            });
 
-        fechaBloqueo.setHours(fechaBloqueo.getHours() - 1);
+        }
 
         const ahora = new Date();
 
-        if (ahora >= fechaBloqueo) {
+        const fechaCierre = new Date(
+            jornada.rows[0].fecha_cierre
+        );
+
+        if (ahora >= fechaCierre) {
 
             return res.status(403).json({
                 mensaje: "La jornada ya está cerrada"

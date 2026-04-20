@@ -1,27 +1,36 @@
-const pool = require("../config/db");
-
-const crearPartido = async (req, res) => {
+const crearPartidosLote = async (req, res) => {
 
     try {
 
-        const {
-            jornada_id,
-            local,
-            visitante,
-            fecha,
-            es_comodin
-        } = req.body;
+        const { jornada_id, partidos } = req.body;
 
-        if (!jornada_id || !local || !visitante || !fecha) {
+        if (!jornada_id || !partidos || partidos.length === 0) {
 
             return res.status(400).json({
-                mensaje: "Faltan datos obligatorios"
+                mensaje: "Datos incompletos"
             });
 
         }
 
-        const nuevoPartido = await pool.query(
-            `
+        const values = [];
+
+        const placeholders = partidos.map((p, index) => {
+
+            const baseIndex = index * 5;
+
+            values.push(
+                jornada_id,
+                p.local,
+                p.visitante,
+                p.fecha,
+                p.es_comodin ?? false
+            );
+
+            return `($${baseIndex + 1},$${baseIndex + 2},$${baseIndex + 3},$${baseIndex + 4},$${baseIndex + 5})`;
+
+        });
+
+        const query = `
             INSERT INTO partidos
             (
                 jornada_id,
@@ -30,21 +39,17 @@ const crearPartido = async (req, res) => {
                 fecha,
                 es_comodin
             )
-            VALUES ($1,$2,$3,$4,$5)
+            VALUES
+            ${placeholders.join(",")}
             RETURNING *
-            `,
-            [
-                jornada_id,
-                local,
-                visitante,
-                fecha,
-                es_comodin ?? false
-            ]
-        );
+        `;
+
+        const nuevosPartidos = await pool.query(query, values);
 
         res.json({
-            mensaje: "Partido creado correctamente",
-            data: nuevoPartido.rows[0]
+            mensaje: "Partidos creados correctamente",
+            total: nuevosPartidos.rows.length,
+            data: nuevosPartidos.rows
         });
 
     } catch (error) {
@@ -52,7 +57,7 @@ const crearPartido = async (req, res) => {
         console.error(error);
 
         res.status(500).json({
-            mensaje: "Error creando partido"
+            mensaje: "Error creando partidos en lote"
         });
 
     }
@@ -61,5 +66,6 @@ const crearPartido = async (req, res) => {
 
 module.exports = {
     obtenerPartidosPorJornada,
-    crearPartido
+    crearPartido,
+    crearPartidosLote
 };

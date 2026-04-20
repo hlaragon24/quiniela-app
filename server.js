@@ -13,6 +13,7 @@ const rankingRoutes = require("./routes/ranking.routes");
 const authRoutes = require("./routes/auth.routes");
 const campeonRoutes = require("./routes/campeon.routes");
 const jornadasRoutes = require("./routes/jornadas.routes");
+const adminRoutes = require("./routes/admin.routes");
 
 
 
@@ -28,6 +29,7 @@ app.use("/auth", authRoutes);
 app.use("/campeon", campeonRoutes);
 app.use("/ranking", rankingRoutes);
 app.use("/jornadas", jornadasRoutes);
+app.use("/admin", adminRoutes);
 
 // Ruta base de prueba
 app.get("/", (req, res) => {
