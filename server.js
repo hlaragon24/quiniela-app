@@ -12,6 +12,7 @@ const resultadosRoutes = require("./routes/resultados.routes");
 const rankingRoutes = require("./routes/ranking.routes");
 const authRoutes = require("./routes/auth.routes");
 const campeonRoutes = require("./routes/campeon.routes");
+const jornadasRoutes = require("./routes/jornadas.routes");
 
 
 
@@ -26,6 +27,7 @@ app.use("/ranking", rankingRoutes);
 app.use("/auth", authRoutes);
 app.use("/campeon", campeonRoutes);
 app.use("/ranking", rankingRoutes);
+app.use("/jornadas", jornadasRoutes);
 
 // Ruta base de prueba
 app.get("/", (req, res) => {

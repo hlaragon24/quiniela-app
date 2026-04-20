@@ -1,15 +1,35 @@
-const verificarAdmin = (req, res, next) => {
+const validarAdmin = (req, res, next) => {
 
-    if (req.usuario.rol !== "admin") {
+    try {
 
-        return res.status(403).json({
-            mensaje: "Acceso solo para administradores"
+        if (!req.user) {
+
+            return res.status(401).json({
+                mensaje: "Usuario no autenticado"
+            });
+
+        }
+
+        if (req.user.rol !== "admin") {
+
+            return res.status(403).json({
+                mensaje: "Acceso solo para administradores"
+            });
+
+        }
+
+        next();
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error validando permisos"
         });
 
     }
 
-    next();
-
 };
 
-module.exports = verificarAdmin;
+module.exports = validarAdmin;

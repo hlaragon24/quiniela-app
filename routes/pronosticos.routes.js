@@ -2,15 +2,17 @@ const express = require("express");
 
 const router = express.Router();
 
-const { guardarPronostico } = require("../controllers/pronosticos.controller");
+const controller = require("../controllers/pronosticos.controller");
 
-const verificarToken = require("../middleware/auth.middleware");
+const authMiddleware = require("../middleware/auth.middleware");
 
+const validarJornadaAbierta = require("../middleware/jornada.middleware");
 
 router.post(
     "/",
-    verificarToken,
-    guardarPronostico
+    authMiddleware,
+    validarJornadaAbierta,
+    controller.guardarPronostico
 );
 
 module.exports = router;

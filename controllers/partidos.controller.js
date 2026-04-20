@@ -1,19 +1,65 @@
-const { partidos } = require("../data/database");
+const pool = require("../config/db");
 
-const obtenerPartidosPorJornada = (req, res) => {
+const crearPartido = async (req, res) => {
 
-    const jornadaId = parseInt(req.params.jornadaId);
+    try {
 
-    console.log(partidos);
+        const {
+            jornada_id,
+            local,
+            visitante,
+            fecha,
+            es_comodin
+        } = req.body;
 
-    const partidosFiltrados = partidos.filter(
-        partido => partido.jornada_id === jornadaId
-    );
+        if (!jornada_id || !local || !visitante || !fecha) {
 
-    res.json(partidosFiltrados);
+            return res.status(400).json({
+                mensaje: "Faltan datos obligatorios"
+            });
+
+        }
+
+        const nuevoPartido = await pool.query(
+            `
+            INSERT INTO partidos
+            (
+                jornada_id,
+                local,
+                visitante,
+                fecha,
+                es_comodin
+            )
+            VALUES ($1,$2,$3,$4,$5)
+            RETURNING *
+            `,
+            [
+                jornada_id,
+                local,
+                visitante,
+                fecha,
+                es_comodin ?? false
+            ]
+        );
+
+        res.json({
+            mensaje: "Partido creado correctamente",
+            data: nuevoPartido.rows[0]
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error creando partido"
+        });
+
+    }
 
 };
 
 module.exports = {
-    obtenerPartidosPorJornada
+    obtenerPartidosPorJornada,
+    crearPartido
 };
