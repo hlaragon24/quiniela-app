@@ -21,5 +21,10 @@ router.get(
   controller.obtenerPronosticosUsuario
 );
 
+router.get(
+  "/mis-pronosticos",
+  authMiddleware,
+  controller.obtenerPronosticosUsuario
+);
 
 module.exports = router;

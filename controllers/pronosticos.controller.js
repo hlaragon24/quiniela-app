@@ -131,6 +131,6 @@ const obtenerPronosticosUsuario = async (req, res) => {
 
 
 module.exports = {
-    guardarPronostico,
-    obtenerPronosticosUsuario
+  guardarPronostico,
+  obtenerPronosticosUsuario
 };
