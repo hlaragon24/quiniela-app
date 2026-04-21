@@ -21,4 +21,5 @@ router.get(
   controller.obtenerPronosticosUsuario
 );
 
+
 module.exports = router;

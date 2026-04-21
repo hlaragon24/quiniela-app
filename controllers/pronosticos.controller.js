@@ -89,16 +89,31 @@ VER PRONÓSTICOS DEL USUARIO
 */
 const obtenerPronosticosUsuario = async (req, res) => {
 
-    const usuario_id = req.usuario.id;
-
     try {
 
-        const resultado = await pool.query(
-            `SELECT * FROM pronosticos
-             WHERE usuario_id = $1`,
-            [usuario_id]
-        );
+        const usuarioId = req.usuario.id;
 
+        const resultado = await pool.query(
+            `
+            SELECT
+                partidos.id,
+                partidos.local,
+                partidos.visitante,
+                partidos.es_comodin,
+                partidos.jornada_id,
+                resultados.goles_local,
+                resultados.goles_visitante,
+                pronosticos.puntos
+            FROM pronosticos
+            JOIN partidos
+                ON pronosticos.partido_id = partidos.id
+            LEFT JOIN resultados
+                ON partidos.id = resultados.partido_id
+            WHERE pronosticos.usuario_id = $1
+            ORDER BY partidos.id
+            `,
+            [usuarioId]
+        );
 
         res.json(resultado.rows);
 
@@ -107,7 +122,7 @@ const obtenerPronosticosUsuario = async (req, res) => {
         console.error(error);
 
         res.status(500).json({
-            mensaje: "Error obteniendo pronósticos"
+            mensaje: "Error obteniendo pronósticos usuario"
         });
 
     }
