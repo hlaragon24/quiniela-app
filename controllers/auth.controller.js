@@ -118,8 +118,12 @@ const login = async (req, res) => {
 
         res.json({
             mensaje: "Login correcto",
-            token
-        });
+           token,
+           usuario: {
+           id: usuario.id,
+           nombre: usuario.nombre
+  }
+});
 
     } catch (error) {
 
