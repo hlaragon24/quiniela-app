@@ -2,11 +2,9 @@ const jwt = require("jsonwebtoken");
 
 const SECRET = "quiniela-secret-key";
 
-
 const verificarToken = (req, res, next) => {
 
     const authHeader = req.headers.authorization;
-
 
     if (!authHeader) {
 
@@ -16,10 +14,10 @@ const verificarToken = (req, res, next) => {
 
     }
 
+    // quitar "Bearer "
+    const token = authHeader.split(" ")[1];
 
     try {
-
-        const token = authHeader.split(" ")[1];
 
         const decoded = jwt.verify(token, SECRET);
 
@@ -27,7 +25,7 @@ const verificarToken = (req, res, next) => {
 
         next();
 
-    } catch (error) {
+    } catch {
 
         return res.status(401).json({
             mensaje: "Token inválido"
@@ -36,6 +34,5 @@ const verificarToken = (req, res, next) => {
     }
 
 };
-
 
 module.exports = verificarToken;
