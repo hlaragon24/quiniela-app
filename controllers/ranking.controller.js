@@ -1,39 +1,37 @@
-
 const pool = require("../config/database");
 
 
 /*
 ====================================
-RANKING GENERAL
+RANKING GENERAL (acumulado)
 ====================================
 */
-
-const obtenerRanking = async (req, res) => {
+const obtenerRankingGeneral = async (req, res) => {
 
     try {
 
-        const ranking = await pool.query(
+        const resultado = await pool.query(
             `
-            SELECT
+            SELECT 
                 usuarios.id,
                 usuarios.nombre,
                 COALESCE(SUM(pronosticos.puntos),0) AS puntos
             FROM usuarios
             LEFT JOIN pronosticos
-            ON usuarios.id = pronosticos.usuario_id
+                ON usuarios.id = pronosticos.usuario_id
             GROUP BY usuarios.id
             ORDER BY puntos DESC
             `
         );
 
-        res.json(ranking.rows);
+        res.json(resultado.rows);
 
     } catch (error) {
 
         console.error(error);
 
         res.status(500).json({
-            mensaje: "Error obteniendo ranking"
+            mensaje: "Error obteniendo ranking general"
         });
 
     }
@@ -46,37 +44,31 @@ const obtenerRanking = async (req, res) => {
 RANKING POR JORNADA
 ====================================
 */
-
 const obtenerRankingPorJornada = async (req, res) => {
-
-    const jornada_id = parseInt(req.params.jornadaId);
 
     try {
 
-        const ranking = await pool.query(
+        const { jornada } = req.params;
+
+        const resultado = await pool.query(
             `
-            SELECT
+            SELECT 
                 usuarios.id,
                 usuarios.nombre,
                 COALESCE(SUM(pronosticos.puntos),0) AS puntos
             FROM usuarios
-
             LEFT JOIN pronosticos
-            ON usuarios.id = pronosticos.usuario_id
-
+                ON usuarios.id = pronosticos.usuario_id
             LEFT JOIN partidos
-            ON pronosticos.partido_id = partidos.id
-
+                ON pronosticos.partido_id = partidos.id
             WHERE partidos.jornada_id = $1
-
             GROUP BY usuarios.id
-
             ORDER BY puntos DESC
             `,
-            [jornada_id]
+            [jornada]
         );
 
-        res.json(ranking.rows);
+        res.json(resultado.rows);
 
     } catch (error) {
 
@@ -92,6 +84,6 @@ const obtenerRankingPorJornada = async (req, res) => {
 
 
 module.exports = {
-    obtenerRanking,
+    obtenerRankingGeneral,
     obtenerRankingPorJornada
 };

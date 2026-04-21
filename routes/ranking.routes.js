@@ -2,15 +2,18 @@ const express = require("express");
 
 const router = express.Router();
 
-const {
-    obtenerRanking,
-    obtenerRankingPorJornada
-} = require("../controllers/ranking.controller");
+const controller = require("../controllers/ranking.controller");
 
 
-router.get("/", obtenerRanking);
+router.get(
+    "/",
+    controller.obtenerRankingGeneral
+);
 
-router.get("/jornada/:jornadaId", obtenerRankingPorJornada);
+router.get(
+    "/jornada/:jornada",
+    controller.obtenerRankingPorJornada
+);
 
 
 module.exports = router;
