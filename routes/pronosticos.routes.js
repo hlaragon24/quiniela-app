@@ -15,6 +15,12 @@ router.post(
     controller.guardarPronostico
 );
 
+router.post(
+  "/guardar-jornada",
+  authMiddleware,
+  controller.guardarPronosticosJornada
+);
+
 router.get(
   "/usuario",
   authMiddleware,
