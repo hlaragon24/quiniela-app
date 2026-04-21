@@ -196,5 +196,6 @@ const guardarPronosticosJornada = async (req, res) => {
 
 module.exports = {
   guardarPronostico,
-  obtenerPronosticosUsuario
+  obtenerPronosticosUsuario,
+  guardarPronosticosJornada
 };
