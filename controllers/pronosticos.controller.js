@@ -141,6 +141,9 @@ const obtenerPronosticosUsuario = async (req, res) => {
 
 const guardarPronosticosJornada = async (req, res) => {
 
+  console.log("usuario:", req.usuario);
+  console.log("body:", req.body);
+
   const usuario_id = req.usuario.id;
 
   const pronosticos = req.body;
