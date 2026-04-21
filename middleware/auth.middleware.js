@@ -5,10 +5,10 @@ const SECRET = "quiniela-secret-key";
 
 const verificarToken = (req, res, next) => {
 
-    const token = req.headers.authorization;
+    const authHeader = req.headers.authorization;
 
 
-    if (!token) {
+    if (!authHeader) {
 
         return res.status(401).json({
             mensaje: "Token requerido"
@@ -19,13 +19,15 @@ const verificarToken = (req, res, next) => {
 
     try {
 
+        const token = authHeader.split(" ")[1];
+
         const decoded = jwt.verify(token, SECRET);
 
         req.usuario = decoded;
 
         next();
 
-    } catch {
+    } catch (error) {
 
         return res.status(401).json({
             mensaje: "Token inválido"
