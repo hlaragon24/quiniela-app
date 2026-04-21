@@ -29,6 +29,7 @@ app.use("/jornadas", jornadasRoutes);
 app.use("/admin", adminRoutes);
 
 
+
 // Ruta base
 app.get("/", (req, res) => {
     res.send("Servidor funcionando 🚀 Quiniela App activa");
