@@ -8,11 +8,13 @@ const authMiddleware = require("../middleware/auth.middleware");
 
 const validarAdmin = require("../middleware/admin.middleware");
 
-router.put(
-    "/:partidoId",
-    authMiddleware,
-    validarAdmin,
-    controller.registrarResultado
+
+router.post(
+  "/:partidoId",
+  authMiddleware,
+  validarAdmin,
+  controller.registrarResultado
 );
+
 
 module.exports = router;
