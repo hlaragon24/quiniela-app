@@ -1,5 +1,43 @@
 const pool = require("../config/database");
 
+
+const obtenerJornadaPorNumero = async (req, res) => {
+
+    try {
+
+        const { numero } = req.params;
+
+        const resultado = await pool.query(
+            `
+            SELECT *
+            FROM jornadas
+            WHERE numero = $1
+            `,
+            [numero]
+        );
+
+        if (resultado.rows.length === 0) {
+
+            return res.status(404).json({
+                mensaje: "Jornada no encontrada"
+            });
+
+        }
+
+        res.json(resultado.rows[0]);
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error obteniendo jornada"
+        });
+
+    }
+
+};
+
 const crearJornada = async (req, res) => {
 
     try {
@@ -118,6 +156,7 @@ const obtenerEstadoJornada = async (req, res) => {
 };
 
 module.exports = {
+    obtenerJornadaPorNumero,
     crearJornada,
     obtenerJornadas,
     obtenerEstadoJornada

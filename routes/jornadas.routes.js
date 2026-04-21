@@ -14,17 +14,21 @@ router.get(
     controller.obtenerJornadas
 );
 
+router.get(
+    "/:numero",
+    controller.obtenerJornadaPorNumero
+);
+
+router.get(
+    "/:numero/estado",
+    controller.obtenerEstadoJornada
+);
 
 router.post(
     "/",
     authMiddleware,
     validarAdmin,
     controller.crearJornada
-);
-
-router.get(
-  "/:numero/estado",
-  controller.obtenerEstadoJornada
 );
 
 module.exports = router;
