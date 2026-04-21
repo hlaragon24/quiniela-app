@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 
-const SECRET = "quiniela-secret-key";
+const { SECRET } = require("../config/jwt");
 
 const verificarToken = (req, res, next) => {
 
@@ -14,8 +14,18 @@ const verificarToken = (req, res, next) => {
 
     }
 
-    // quitar "Bearer "
+    // formato esperado:
+    // Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+
     const token = authHeader.split(" ")[1];
+
+    if (!token) {
+
+        return res.status(401).json({
+            mensaje: "Token inválido"
+        });
+
+    }
 
     try {
 
@@ -25,7 +35,9 @@ const verificarToken = (req, res, next) => {
 
         next();
 
-    } catch {
+    } catch (error) {
+
+        console.error("Error verificando token:", error.message);
 
         return res.status(401).json({
             mensaje: "Token inválido"

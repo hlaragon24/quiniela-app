@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const pool = require("../config/database");
+const { SECRET } = require("../config/jwt");
 
 
 /*
@@ -29,10 +30,8 @@ const register = async (req, res) => {
 
         }
 
-
         // Encriptar password
         const passwordHash = await bcrypt.hash(password, 10);
-
 
         // Insertar usuario en PostgreSQL
         await pool.query(
@@ -40,7 +39,6 @@ const register = async (req, res) => {
              VALUES ($1, $2, $3)`,
             [nombre, email, passwordHash]
         );
-
 
         res.json({
             mensaje: "Usuario registrado correctamente"
@@ -84,9 +82,7 @@ const login = async (req, res) => {
 
         }
 
-
         const usuario = resultado.rows[0];
-
 
         // Validar password
         const passwordValido = await bcrypt.compare(
@@ -102,28 +98,24 @@ const login = async (req, res) => {
 
         }
 
-
         // Generar token JWT
         const token = jwt.sign(
             {
                 id: usuario.id,
                 rol: usuario.rol
             },
-            process.env.JWT_SECRET,
-            {
-                expiresIn: "8h"
-            }
+            SECRET,
+            { expiresIn: "8h" }
         );
-
 
         res.json({
             mensaje: "Login correcto",
-           token,
-           usuario: {
-           id: usuario.id,
-           nombre: usuario.nombre
-  }
-});
+            token,
+            usuario: {
+                id: usuario.id,
+                nombre: usuario.nombre
+            }
+        });
 
     } catch (error) {
 
