@@ -1,4 +1,5 @@
 const db = require("../config/database");
+const { guardarPronostico, obtenerPronosticosUsuario } = require("./pronosticos.controller");
 
 console.log("TIPO DB:", typeof db);
 console.log("DB:", db);
@@ -143,5 +144,8 @@ const crearPartidosLote = async (req, res) => {
 module.exports = {
     obtenerPartidosPorJornada,
     crearPartido,
-    crearPartidosLote
+    crearPartidosLote,
+    guardarPronostico,
+    obtenerPronosticosUsuario,
+    guardarPronosticosJornada,
 };
