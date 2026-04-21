@@ -135,7 +135,7 @@ let puntosMarcador = 2;
 if (esComodin) {
 
     puntosResultado = 2;
-    puntosMarcador = 4;
+    puntosMarcador = 3;
 
 }
 
