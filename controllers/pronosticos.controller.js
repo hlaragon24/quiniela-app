@@ -103,6 +103,7 @@ const obtenerPronosticosUsuario = async (req, res) => {
                 partidos.jornada_id,
                 resultados.goles_local,
                 resultados.goles_visitante,
+                pronosticos.resultado AS pronostico_usuario,
                 pronosticos.puntos
             FROM pronosticos
             JOIN partidos
