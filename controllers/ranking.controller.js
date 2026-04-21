@@ -1,5 +1,37 @@
 const pool = require("../config/database");
 
+const obtenerHistorialRanking = async (req, res) => {
+
+    try {
+
+        const resultado = await pool.query(`
+            SELECT
+                usuarios.id,
+                usuarios.nombre,
+                partidos.jornada_id,
+                SUM(pronosticos.puntos) AS puntos
+            FROM usuarios
+            LEFT JOIN pronosticos
+                ON usuarios.id = pronosticos.usuario_id
+            LEFT JOIN partidos
+                ON pronosticos.partido_id = partidos.id
+            GROUP BY usuarios.id, partidos.jornada_id
+            ORDER BY usuarios.id, partidos.jornada_id
+        `);
+
+        res.json(resultado.rows);
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error obteniendo historial ranking"
+        });
+
+    }
+
+};
 
 /*
 ====================================
@@ -85,5 +117,6 @@ const obtenerRankingPorJornada = async (req, res) => {
 
 module.exports = {
     obtenerRankingGeneral,
-    obtenerRankingPorJornada
+    obtenerRankingPorJornada,
+    obtenerHistorialRanking
 };

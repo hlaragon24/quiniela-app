@@ -15,5 +15,10 @@ router.get(
     controller.obtenerRankingPorJornada
 );
 
+router.get(
+    "/historial",
+    controller.obtenerHistorialRanking
+);
+
 
 module.exports = router;
