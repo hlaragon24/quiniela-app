@@ -113,16 +113,43 @@ const calcularPuntos = async (partido_id) => {
         let puntos = 0;
 
 
-        if (pronostico.resultado === resultadoReal)
-            puntos += 1;
+// verificar si es comodín
+const partido = await pool.query(
+    `
+    SELECT es_comodin
+    FROM partidos
+    WHERE id = $1
+    `,
+    [partido_id]
+);
+
+const esComodin = partido.rows[0]?.es_comodin;
 
 
-        if (
-            pronostico.marcador_local === goles_local &&
-            pronostico.marcador_visitante === goles_visitante
-        )
-            puntos += 2;
+// puntos base
+let puntosResultado = 1;
+let puntosMarcador = 2;
 
+
+// duplicar si es comodín
+if (esComodin) {
+
+    puntosResultado = 2;
+    puntosMarcador = 4;
+
+}
+
+
+// calcular puntos
+if (pronostico.resultado === resultadoReal)
+    puntos += puntosResultado;
+
+
+if (
+    pronostico.marcador_local === goles_local &&
+    pronostico.marcador_visitante === goles_visitante
+)
+    puntos += puntosMarcador;
 
         await pool.query(
             `
