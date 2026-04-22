@@ -59,11 +59,13 @@ router.get("/jornada/:jornada", async (req, res) => {
         row.real_local > row.real_visitante
           ? "L"
           : row.real_local < row.real_visitante
-          ? "V"
-          : "E";
+            ? "V"
+            : "E";
 
 
       if (
+        row.real_local !== null &&
+        row.real_visitante !== null &&
         row.marcador_local === row.real_local &&
         row.marcador_visitante === row.real_visitante
       ) {
@@ -72,7 +74,11 @@ router.get("/jornada/:jornada", async (req, res) => {
 
       }
 
-      else if (row.resultado === signoReal) {
+      else if (
+        row.real_local !== null &&
+        row.real_visitante !== null &&
+        row.resultado === signoReal
+      ) {
 
         puntos = 1;
 
