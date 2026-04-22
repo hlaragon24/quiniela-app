@@ -16,6 +16,7 @@ router.get("/jornada/:jornada", async (req, res) => {
     p.id,
     p.local,
     p.visitante,
+    p.jornada_id,
     p.es_comodin,
     r.goles_local AS real_local,
     r.goles_visitante AS real_visitante,
@@ -44,10 +45,14 @@ router.get("/jornada/:jornada", async (req, res) => {
 
         tabla[partidoNombre] = {
 
+          jornada: row.jornada_id,
+
           resultado_real:
             row.real_local !== null
               ? `${row.real_local}-${row.real_visitante}`
               : "-",
+
+          es_comodin: row.es_comodin,
 
           pronosticos: {}
 
@@ -120,7 +125,7 @@ router.get("/jornada/:jornada", async (req, res) => {
         row.es_comodin
       );
 
-      
+
       tabla[partidoNombre].pronosticos[row.usuario] = {
 
         pronostico:
@@ -133,17 +138,21 @@ router.get("/jornada/:jornada", async (req, res) => {
     });
 
 
-    const respuesta = Object.keys(tabla).map(partido => ({
+    const respuesta = Object.keys(tabla)
+      .map(partido => ({
 
-      partido,
+        partido,
 
-      resultado_real:
-        tabla[partido].resultado_real,
+        jornada: tabla[partido].jornada,
 
-      pronosticos:
-        tabla[partido].pronosticos
+        resultado_real: tabla[partido].resultado_real,
 
-    }));
+        es_comodin: tabla[partido].es_comodin,
+
+        pronosticos: tabla[partido].pronosticos
+
+      }))
+      .sort((a, b) => a.jornada - b.jornada);
 
 
     res.json(respuesta);
