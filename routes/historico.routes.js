@@ -12,8 +12,8 @@ router.get("/jornada/:jornada", async (req, res) => {
     const result = await pool.query(`
   SELECT
     p.id,
-    p.equipo_local,
-    p.equipo_visitante,
+    p.local,
+    p.visitante,
     p.marcador_local AS real_local,
     p.marcador_visitante AS real_visitante,
     u.username AS usuario,
@@ -29,74 +29,74 @@ router.get("/jornada/:jornada", async (req, res) => {
 
 
 
-   const tabla = {};
+    const tabla = {};
 
-result.rows.forEach(row => {
+    result.rows.forEach(row => {
 
-  const partidoNombre =
-    `${row.equipo_local} vs ${row.equipo_visitante}`;
+      const partidoNombre =
+        `${row.equipo_local} vs ${row.equipo_visitante}`;
 
-  if (!tabla[partidoNombre]) {
+      if (!tabla[partidoNombre]) {
 
-    tabla[partidoNombre] = {
+        tabla[partidoNombre] = {
 
-      resultado_real:
-        `${row.real_local}-${row.real_visitante}`,
+          resultado_real:
+            `${row.real_local}-${row.real_visitante}`,
 
-      pronosticos: {}
+          pronosticos: {}
 
-    };
+        };
 
-  }
+      }
 
-  let puntos = 0;
+      let puntos = 0;
 
-  const signoReal =
-    row.real_local > row.real_visitante
-      ? "L"
-      : row.real_local < row.real_visitante
-      ? "V"
-      : "E";
-
-
-  if (
-    row.marcador_local === row.real_local &&
-    row.marcador_visitante === row.real_visitante
-  ) {
-
-    puntos = 3;
-
-  }
-
-  else if (row.resultado === signoReal) {
-
-    puntos = 1;
-
-  }
+      const signoReal =
+        row.real_local > row.real_visitante
+          ? "L"
+          : row.real_local < row.real_visitante
+            ? "V"
+            : "E";
 
 
-  tabla[partidoNombre].pronosticos[row.usuario] = {
+      if (
+        row.marcador_local === row.real_local &&
+        row.marcador_visitante === row.real_visitante
+      ) {
 
-    pronostico:
-      `${row.resultado} ${row.marcador_local}-${row.marcador_visitante}`,
+        puntos = 3;
 
-    puntos
+      }
 
-  };
+      else if (row.resultado === signoReal) {
 
-});
+        puntos = 1;
+
+      }
+
+
+      tabla[partidoNombre].pronosticos[row.usuario] = {
+
+        pronostico:
+          `${row.resultado} ${row.marcador_local}-${row.marcador_visitante}`,
+
+        puntos
+
+      };
+
+    });
 
     const respuesta = Object.keys(tabla).map(partido => ({
 
-  partido,
+      partido,
 
-  resultado_real:
-    tabla[partido].resultado_real,
+      resultado_real:
+        tabla[partido].resultado_real,
 
-  pronosticos:
-    tabla[partido].pronosticos
+      pronosticos:
+        tabla[partido].pronosticos
 
-}));
+    }));
 
     res.json(respuesta);
 
