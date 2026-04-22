@@ -15,8 +15,8 @@ router.get("/jornada/:jornada", async (req, res) => {
         p.visitante,
         u.nombre AS usuario,
         pr.resultado,
-        pr.goles_local,
-        pr.goles_visitante
+        pr.marcador_local,
+        pr.marcador_visitante
       FROM pronosticos pr
       JOIN partidos p ON pr.partido_id = p.id
       JOIN usuarios u ON pr.usuario_id = u.id
@@ -38,7 +38,7 @@ router.get("/jornada/:jornada", async (req, res) => {
       }
 
       tabla[partido][row.usuario] =
-        `${row.resultado} ${row.goles_local}-${row.goles_visitante}`;
+        `${row.resultado} ${row.marcador_local}-${row.marcador_visitante}`;
 
     });
 
