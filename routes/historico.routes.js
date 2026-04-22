@@ -10,44 +10,93 @@ router.get("/jornada/:jornada", async (req, res) => {
   try {
 
     const result = await pool.query(`
-      SELECT
-        p.local,
-        p.visitante,
-        u.nombre AS usuario,
-        pr.resultado,
-        pr.marcador_local,
-        pr.marcador_visitante
-      FROM pronosticos pr
-      JOIN partidos p ON pr.partido_id = p.id
-      JOIN usuarios u ON pr.usuario_id = u.id
-      WHERE p.jornada_id = $1
-      ORDER BY p.id
-    `, [jornada]);
+  SELECT
+    p.id,
+    p.equipo_local,
+    p.equipo_visitante,
+    p.marcador_local AS real_local,
+    p.marcador_visitante AS real_visitante,
+    u.username AS usuario,
+    pr.resultado,
+    pr.marcador_local,
+    pr.marcador_visitante
+  FROM pronosticos pr
+  JOIN partidos p ON pr.partido_id = p.id
+  JOIN usuarios u ON pr.usuario_id = u.id
+  WHERE p.jornada_id = $1
+  ORDER BY p.id
+`, [jornada]);
 
-    const tabla = {};
 
-    result.rows.forEach(row => {
 
-      const partido =
-        `${row.local} vs ${row.visitante}`;
+   const tabla = {};
 
-      if (!tabla[partido]) {
+result.rows.forEach(row => {
 
-        tabla[partido] = {};
+  const partidoNombre =
+    `${row.equipo_local} vs ${row.equipo_visitante}`;
 
-      }
+  if (!tabla[partidoNombre]) {
 
-      tabla[partido][row.usuario] =
-        `${row.resultado} ${row.marcador_local}-${row.marcador_visitante}`;
+    tabla[partidoNombre] = {
 
-    });
+      resultado_real:
+        `${row.real_local}-${row.real_visitante}`,
+
+      pronosticos: {}
+
+    };
+
+  }
+
+  let puntos = 0;
+
+  const signoReal =
+    row.real_local > row.real_visitante
+      ? "L"
+      : row.real_local < row.real_visitante
+      ? "V"
+      : "E";
+
+
+  if (
+    row.marcador_local === row.real_local &&
+    row.marcador_visitante === row.real_visitante
+  ) {
+
+    puntos = 3;
+
+  }
+
+  else if (row.resultado === signoReal) {
+
+    puntos = 1;
+
+  }
+
+
+  tabla[partidoNombre].pronosticos[row.usuario] = {
+
+    pronostico:
+      `${row.resultado} ${row.marcador_local}-${row.marcador_visitante}`,
+
+    puntos
+
+  };
+
+});
 
     const respuesta = Object.keys(tabla).map(partido => ({
 
-      partido,
-      pronosticos: tabla[partido]
+  partido,
 
-    }));
+  resultado_real:
+    tabla[partido].resultado_real,
+
+  pronosticos:
+    tabla[partido].pronosticos
+
+}));
 
     res.json(respuesta);
 
