@@ -11,8 +11,8 @@ router.get("/jornada/:jornada", async (req, res) => {
 
     const result = await pool.query(`
   SELECT
-    p.equipo_local,
-    p.equipo_visitante,
+    p.local,
+    p.visitante,
     u.username AS usuario,
     pr.resultado,
     pr.marcador_local,
