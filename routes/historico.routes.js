@@ -21,7 +21,8 @@ router.get("/jornada/:jornada", async (req, res) => {
         u.email AS usuario,
         pr.resultado,
         pr.marcador_local,
-        pr.marcador_visitante
+        pr.marcador_visitante,
+        p.es_comodin
       FROM pronosticos pr
       JOIN partidos p ON pr.partido_id = p.id
       JOIN usuarios u ON pr.usuario_id = u.id
@@ -43,7 +44,9 @@ router.get("/jornada/:jornada", async (req, res) => {
         tabla[partidoNombre] = {
 
           resultado_real:
-            `${row.real_local}-${row.real_visitante}`,
+            row.real_local !== null
+              ? `${row.real_local}-${row.real_visitante}`
+              : "-",
 
           pronosticos: {}
 
@@ -55,32 +58,56 @@ router.get("/jornada/:jornada", async (req, res) => {
       let puntos = 0;
 
 
-      const signoReal =
-        row.real_local > row.real_visitante
-          ? "L"
-          : row.real_local < row.real_visitante
+      // SOLO si existe resultado real
+      if (
+        row.real_local !== null &&
+        row.real_visitante !== null
+      ) {
+
+        const signoReal =
+          row.real_local > row.real_visitante
+            ? "L"
+            : row.real_local < row.real_visitante
             ? "V"
             : "E";
 
 
-      if (
-        row.real_local !== null &&
-        row.real_visitante !== null &&
-        row.marcador_local === row.real_local &&
-        row.marcador_visitante === row.real_visitante
-      ) {
+        const marcadorExacto =
+          row.marcador_local === row.real_local &&
+          row.marcador_visitante === row.real_visitante;
 
-        puntos = 3;
 
-      }
+        const signoCorrecto =
+          row.resultado === signoReal;
 
-      else if (
-        row.real_local !== null &&
-        row.real_visitante !== null &&
-        row.resultado === signoReal
-      ) {
 
-        puntos = 1;
+        // ⭐ PARTIDO COMODIN
+        if (row.es_comodin) {
+
+          if (marcadorExacto && signoCorrecto)
+            puntos = 5;
+
+          else if (marcadorExacto)
+            puntos = 3;
+
+          else if (signoCorrecto)
+            puntos = 2;
+
+        }
+
+        // PARTIDO NORMAL
+        else {
+
+          if (marcadorExacto && signoCorrecto)
+            puntos = 3;
+
+          else if (marcadorExacto)
+            puntos = 2;
+
+          else if (signoCorrecto)
+            puntos = 1;
+
+        }
 
       }
 
