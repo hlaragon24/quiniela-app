@@ -16,7 +16,7 @@ router.get("/jornada/:jornada", async (req, res) => {
     p.visitante,
     pr.marcador_local AS real_local,
     pr.marcador_visitante AS real_visitante,
-    u.username AS usuario,
+    u.email AS usuario,
     pr.resultado,
     pr.marcador_local,
     pr.marcador_visitante
