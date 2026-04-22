@@ -28,9 +28,9 @@ app.use("/auth", authRoutes);
 app.use("/campeon", campeonRoutes);
 app.use("/jornadas", jornadasRoutes);
 app.use("/admin", adminRoutes);
-app.use("/historico", historicoRoutes);
+app.use("/historico", historicoRoutes); 
 
-
+//
 
 // Ruta base
 app.get("/", (req, res) => {

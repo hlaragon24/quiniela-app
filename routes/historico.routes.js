@@ -1,0 +1,66 @@
+const express = require("express");
+const router = express.Router();
+
+const pool = require("../config/database");
+
+router.get("/jornada/:jornada", async (req, res) => {
+
+  const jornada = req.params.jornada;
+
+  try {
+
+    const result = await pool.query(`
+      SELECT
+        p.nombre_local,
+        p.nombre_visitante,
+        u.nombre AS usuario,
+        pr.resultado,
+        pr.goles_local,
+        pr.goles_visitante
+      FROM pronosticos pr
+      JOIN partidos p ON pr.partido_id = p.id
+      JOIN usuarios u ON pr.usuario_id = u.id
+      WHERE p.jornada = $1
+      ORDER BY p.id
+    `, [jornada]);
+
+    const tabla = {};
+
+    result.rows.forEach(row => {
+
+      const partido =
+        `${row.nombre_local} vs ${row.nombre_visitante}`;
+
+      if (!tabla[partido]) {
+
+        tabla[partido] = {};
+
+      }
+
+      tabla[partido][row.usuario] =
+        `${row.resultado} ${row.goles_local}-${row.goles_visitante}`;
+
+    });
+
+    const respuesta = Object.keys(tabla).map(partido => ({
+
+      partido,
+      pronosticos: tabla[partido]
+
+    }));
+
+    res.json(respuesta);
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      error: "Error obteniendo histórico"
+    });
+
+  }
+
+});
+
+module.exports = router;
