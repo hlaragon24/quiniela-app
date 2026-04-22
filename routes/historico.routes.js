@@ -72,7 +72,6 @@ router.get("/jornada/:jornada", async (req, res) => {
 
         if (row.real_local > row.real_visitante)
           signoReal = "L";
-
         else if (row.real_local < row.real_visitante)
           signoReal = "V";
 
@@ -81,29 +80,45 @@ router.get("/jornada/:jornada", async (req, res) => {
           row.resultado === signoReal;
 
 
-        // ⭐ PARTIDO COMODIN
-        if (row.es_comodin) {
+        const esComodin =
+          row.es_comodin === true ||
+          row.es_comodin === 1;
 
-          if (marcadorExacto)
+
+        if (esComodin) {
+
+          if (marcadorExacto && signoCorrecto)
             puntos = 5;
+
+          else if (marcadorExacto)
+            puntos = 3;
 
           else if (signoCorrecto)
             puntos = 2;
 
         }
 
-        // PARTIDO NORMAL
         else {
 
-          if (marcadorExacto)
+          if (marcadorExacto && signoCorrecto)
             puntos = 3;
+
+          else if (marcadorExacto)
+            puntos = 2;
 
           else if (signoCorrecto)
             puntos = 1;
 
         }
 
+
       }
+      console.log(
+        row.local,
+        row.visitante,
+        "comodin:",
+        row.es_comodin
+      );
 
 
       tabla[partidoNombre].pronosticos[row.usuario] = {
