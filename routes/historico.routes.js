@@ -13,7 +13,7 @@ router.get("/jornada/:jornada", async (req, res) => {
   SELECT
     p.local,
     p.visitante,
-    u.username AS usuario,
+    u.id AS usuario,
     pr.resultado,
     pr.marcador_local,
     pr.marcador_visitante
