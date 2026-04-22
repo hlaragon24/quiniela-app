@@ -120,20 +120,15 @@ router.get("/jornada/:jornada", async (req, res) => {
         row.es_comodin
       );
 
-       tabla[partidoNombre] = {
-  resultado_real:
-    row.real_local !== null
-      ? `${row.real_local}-${row.real_visitante}`
-      : "-",
+      
+      tabla[partidoNombre].pronosticos[row.usuario] = {
 
-  es_comodin: row.es_comodin,
-
-  pronostico:
+        pronostico:
           `${row.resultado} ${row.marcador_local}-${row.marcador_visitante}`,
 
         puntos
-};
 
+      };
 
     });
 
