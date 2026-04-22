@@ -11,8 +11,8 @@ router.get("/jornada/:jornada", async (req, res) => {
 
     const result = await pool.query(`
       SELECT
-        p.nombre_local,
-        p.nombre_visitante,
+        p.local,
+        p.visitante,
         u.nombre AS usuario,
         pr.resultado,
         pr.goles_local,
@@ -29,7 +29,7 @@ router.get("/jornada/:jornada", async (req, res) => {
     result.rows.forEach(row => {
 
       const partido =
-        `${row.nombre_local} vs ${row.nombre_visitante}`;
+        `${row.local} vs ${row.visitante}`;
 
       if (!tabla[partido]) {
 
