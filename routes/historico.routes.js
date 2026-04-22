@@ -57,24 +57,23 @@ router.get("/jornada/:jornada", async (req, res) => {
 
       let puntos = 0;
 
-
-      // SOLO si existe resultado real
       if (
         row.real_local !== null &&
         row.real_visitante !== null
       ) {
 
-        const signoReal =
-          row.real_local > row.real_visitante
-            ? "L"
-            : row.real_local < row.real_visitante
-            ? "V"
-            : "E";
-
-
         const marcadorExacto =
-          row.marcador_local === row.real_local &&
-          row.marcador_visitante === row.real_visitante;
+          Number(row.marcador_local) === Number(row.real_local) &&
+          Number(row.marcador_visitante) === Number(row.real_visitante);
+
+
+        let signoReal = "E";
+
+        if (row.real_local > row.real_visitante)
+          signoReal = "L";
+
+        else if (row.real_local < row.real_visitante)
+          signoReal = "V";
 
 
         const signoCorrecto =
@@ -84,11 +83,8 @@ router.get("/jornada/:jornada", async (req, res) => {
         // ⭐ PARTIDO COMODIN
         if (row.es_comodin) {
 
-          if (marcadorExacto && signoCorrecto)
+          if (marcadorExacto)
             puntos = 5;
-
-          else if (marcadorExacto)
-            puntos = 3;
 
           else if (signoCorrecto)
             puntos = 2;
@@ -98,11 +94,8 @@ router.get("/jornada/:jornada", async (req, res) => {
         // PARTIDO NORMAL
         else {
 
-          if (marcadorExacto && signoCorrecto)
+          if (marcadorExacto)
             puntos = 3;
-
-          else if (marcadorExacto)
-            puntos = 2;
 
           else if (signoCorrecto)
             puntos = 1;
