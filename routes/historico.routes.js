@@ -17,8 +17,8 @@ router.get("/jornada/:jornada", async (req, res) => {
     p.local,
     p.visitante,
     p.es_comodin,
-    pr.marcador_local AS real_local,
-    pr.marcador_visitante AS real_visitante,
+    r.marcador_local AS real_local,
+    r.marcador_visitante AS real_visitante,
     u.email AS usuario,
     pr.resultado,
     pr.marcador_local,
@@ -26,6 +26,7 @@ router.get("/jornada/:jornada", async (req, res) => {
   FROM pronosticos pr
   JOIN partidos p ON pr.partido_id = p.id
   JOIN usuarios u ON pr.usuario_id = u.id
+  LEFT JOIN resultados r ON r.partido_id = p.id
   WHERE p.jornada_id = $1
   ORDER BY p.id
 `, [jornada]);
