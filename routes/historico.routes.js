@@ -12,23 +12,23 @@ router.get("/jornada/:jornada", async (req, res) => {
     const jornada = req.params.jornada;
 
     const result = await pool.query(`
-      SELECT
-        p.id,
-        p.local,
-        p.visitante,
-        pr.marcador_local AS real_local,
-        pr.marcador_visitante AS real_visitante,
-        u.email AS usuario,
-        pr.resultado,
-        pr.marcador_local,
-        pr.marcador_visitante,
-        p.es_comodin
-      FROM pronosticos pr
-      JOIN partidos p ON pr.partido_id = p.id
-      JOIN usuarios u ON pr.usuario_id = u.id
-      WHERE p.jornada_id = $1
-      ORDER BY p.id
-    `, [jornada]);
+  SELECT
+    p.id,
+    p.local,
+    p.visitante,
+    p.es_comodin,
+    pr.marcador_local AS real_local,
+    pr.marcador_visitante AS real_visitante,
+    u.email AS usuario,
+    pr.resultado,
+    pr.marcador_local,
+    pr.marcador_visitante
+  FROM pronosticos pr
+  JOIN partidos p ON pr.partido_id = p.id
+  JOIN usuarios u ON pr.usuario_id = u.id
+  WHERE p.jornada_id = $1
+  ORDER BY p.id
+`, [jornada]);
 
 
     const tabla = {};
