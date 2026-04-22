@@ -20,7 +20,7 @@ router.get("/jornada/:jornada", async (req, res) => {
       FROM pronosticos pr
       JOIN partidos p ON pr.partido_id = p.id
       JOIN usuarios u ON pr.usuario_id = u.id
-      WHERE p.jornada = $1
+      WHERE p.numero = $1
       ORDER BY p.id
     `, [jornada]);
 
