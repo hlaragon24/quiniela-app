@@ -1,38 +1,108 @@
 const pool = require("../config/database");
 
 
+/*
+====================================
+HISTORIAL RANKING (por jornada)
+====================================
+*/
 const obtenerHistorialRanking = async (req, res) => {
 
-    try {
+  try {
 
-        const resultado = await pool.query(`
-            SELECT
-                usuarios.id,
-                usuarios.nombre,
-                partidos.jornada_id,
-                SUM(pronosticos.puntos) AS puntos
-            FROM usuarios
-            LEFT JOIN pronosticos
-                ON usuarios.id = pronosticos.usuario_id
-            LEFT JOIN partidos
-                ON pronosticos.partido_id = partidos.id
-            GROUP BY usuarios.id, partidos.jornada_id
-            ORDER BY usuarios.id, partidos.jornada_id
-        `);
+    const resultado = await pool.query(`
 
-        res.json(resultado.rows);
+      SELECT
+        u.id,
+        u.nombre,
+        p.jornada_id,
 
-    } catch (error) {
+        SUM(
 
-        console.error(error);
+          CASE
 
-        res.status(500).json({
-            mensaje: "Error obteniendo historial ranking"
-        });
+            WHEN pr.marcador_local = r.marcador_local
+            AND pr.marcador_visitante = r.marcador_visitante
 
-    }
+            THEN
+              CASE
+                WHEN p.es_comodin = true THEN 3
+                ELSE 2
+              END
+
+            ELSE 0
+
+          END
+
+        ) AS puntos_marcador,
+
+
+        SUM(
+
+          CASE
+
+            WHEN pr.resultado =
+
+              CASE
+
+                WHEN r.marcador_local > r.marcador_visitante THEN 'L'
+                WHEN r.marcador_local < r.marcador_visitante THEN 'V'
+                ELSE 'E'
+
+              END
+
+            THEN
+
+              CASE
+                WHEN p.es_comodin = true THEN 2
+                ELSE 1
+              END
+
+            ELSE 0
+
+          END
+
+        ) AS puntos_resultado,
+
+
+        SUM(pr.puntos) AS total
+
+
+      FROM usuarios u
+
+      LEFT JOIN pronosticos pr
+        ON u.id = pr.usuario_id
+
+      LEFT JOIN partidos p
+        ON pr.partido_id = p.id
+
+      LEFT JOIN resultados r
+        ON r.partido_id = p.id
+
+
+      GROUP BY u.id, p.jornada_id
+
+      ORDER BY u.id, p.jornada_id
+
+    `);
+
+    res.json(resultado.rows);
+
+  }
+
+  catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      mensaje: "Error obteniendo historial ranking"
+    });
+
+  }
 
 };
+
+
 
 /*
 ====================================
@@ -41,35 +111,100 @@ RANKING GENERAL (acumulado)
 */
 const obtenerRankingGeneral = async (req, res) => {
 
-    try {
+  try {
 
-        const resultado = await pool.query(
-            `
-            SELECT 
-                usuarios.id,
-                usuarios.nombre,
-                COALESCE(SUM(pronosticos.puntos),0) AS puntos
-            FROM usuarios
-            LEFT JOIN pronosticos
-                ON usuarios.id = pronosticos.usuario_id
-            GROUP BY usuarios.id
-            ORDER BY puntos DESC
-            `
-        );
+    const resultado = await pool.query(`
 
-        res.json(resultado.rows);
+      SELECT
+        u.id,
+        u.nombre,
 
-    } catch (error) {
 
-        console.error(error);
+        SUM(
 
-        res.status(500).json({
-            mensaje: "Error obteniendo ranking general"
-        });
+          CASE
 
-    }
+            WHEN pr.marcador_local = r.marcador_local
+            AND pr.marcador_visitante = r.marcador_visitante
+
+            THEN
+              CASE
+                WHEN p.es_comodin = true THEN 3
+                ELSE 2
+              END
+
+            ELSE 0
+
+          END
+
+        ) AS puntos_marcador,
+
+
+        SUM(
+
+          CASE
+
+            WHEN pr.resultado =
+
+              CASE
+
+                WHEN r.marcador_local > r.marcador_visitante THEN 'L'
+                WHEN r.marcador_local < r.marcador_visitante THEN 'V'
+                ELSE 'E'
+
+              END
+
+            THEN
+
+              CASE
+                WHEN p.es_comodin = true THEN 2
+                ELSE 1
+              END
+
+            ELSE 0
+
+          END
+
+        ) AS puntos_resultado,
+
+
+        SUM(pr.puntos) AS total
+
+
+      FROM usuarios u
+
+      LEFT JOIN pronosticos pr
+        ON u.id = pr.usuario_id
+
+      LEFT JOIN partidos p
+        ON pr.partido_id = p.id
+
+      LEFT JOIN resultados r
+        ON r.partido_id = p.id
+
+
+      GROUP BY u.id
+
+      ORDER BY total DESC
+
+    `);
+
+    res.json(resultado.rows);
+
+  }
+
+  catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      mensaje: "Error obteniendo ranking general"
+    });
+
+  }
 
 };
+
 
 
 /*
@@ -79,45 +214,112 @@ RANKING POR JORNADA
 */
 const obtenerRankingPorJornada = async (req, res) => {
 
-    try {
+  try {
 
-        const { jornada } = req.params;
+    const { jornada } = req.params;
 
-        const resultado = await pool.query(
-            `
-            SELECT 
-                usuarios.id,
-                usuarios.nombre,
-                COALESCE(SUM(pronosticos.puntos),0) AS puntos
-            FROM usuarios
-            LEFT JOIN pronosticos
-                ON usuarios.id = pronosticos.usuario_id
-            LEFT JOIN partidos
-                ON pronosticos.partido_id = partidos.id
-            WHERE partidos.jornada_id = $1
-            GROUP BY usuarios.id
-            ORDER BY puntos DESC
-            `,
-            [jornada]
-        );
+    const resultado = await pool.query(`
 
-        res.json(resultado.rows);
+      SELECT
+        u.id,
+        u.nombre,
 
-    } catch (error) {
 
-        console.error(error);
+        SUM(
 
-        res.status(500).json({
-            mensaje: "Error obteniendo ranking por jornada"
-        });
+          CASE
 
-    }
+            WHEN pr.marcador_local = r.marcador_local
+            AND pr.marcador_visitante = r.marcador_visitante
+
+            THEN
+              CASE
+                WHEN p.es_comodin = true THEN 3
+                ELSE 2
+              END
+
+            ELSE 0
+
+          END
+
+        ) AS puntos_marcador,
+
+
+        SUM(
+
+          CASE
+
+            WHEN pr.resultado =
+
+              CASE
+
+                WHEN r.marcador_local > r.marcador_visitante THEN 'L'
+                WHEN r.marcador_local < r.marcador_visitante THEN 'V'
+                ELSE 'E'
+
+              END
+
+            THEN
+
+              CASE
+                WHEN p.es_comodin = true THEN 2
+                ELSE 1
+              END
+
+            ELSE 0
+
+          END
+
+        ) AS puntos_resultado,
+
+
+        SUM(pr.puntos) AS total
+
+
+      FROM usuarios u
+
+      LEFT JOIN pronosticos pr
+        ON u.id = pr.usuario_id
+
+      LEFT JOIN partidos p
+        ON pr.partido_id = p.id
+
+      LEFT JOIN resultados r
+        ON r.partido_id = p.id
+
+
+      WHERE p.jornada_id = $1
+
+
+      GROUP BY u.id
+
+      ORDER BY total DESC
+
+    `, [jornada]);
+
+
+    res.json(resultado.rows);
+
+  }
+
+  catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      mensaje: "Error obteniendo ranking por jornada"
+    });
+
+  }
 
 };
 
 
+
 module.exports = {
-    obtenerRankingGeneral,
-    obtenerRankingPorJornada,
-    obtenerHistorialRanking
+
+  obtenerRankingGeneral,
+  obtenerRankingPorJornada,
+  obtenerHistorialRanking
+
 };
