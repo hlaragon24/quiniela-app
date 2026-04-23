@@ -140,11 +140,118 @@ const crearPartidosLote = async (req, res) => {
     }
 };
 
+const editarPartido = async (req, res) => {
+
+    try {
+
+        const { id } = req.params;
+
+        const {
+            jornada_id,
+            local,
+            visitante,
+            fecha,
+            es_comodin
+        } = req.body;
+
+        const resultado = await db.query(
+            `
+            UPDATE partidos
+            SET
+                jornada_id = $1,
+                local = $2,
+                visitante = $3,
+                fecha = $4,
+                es_comodin = $5
+            WHERE id = $6
+            RETURNING *
+            `,
+            [
+                jornada_id,
+                local,
+                visitante,
+                fecha,
+                es_comodin,
+                id
+            ]
+        );
+
+        res.json(resultado.rows[0]);
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error editando partido"
+        });
+
+    }
+
+};
+
+const eliminarPartido = async (req, res) => {
+
+    try {
+
+        const { id } = req.params;
+
+        await db.query(
+            `
+            DELETE FROM partidos
+            WHERE id = $1
+            `,
+            [id]
+        );
+
+        res.json({
+            mensaje: "Partido eliminado correctamente"
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error eliminando partido"
+        });
+
+    }
+
+};
+const obtenerTodosPartidos = async (req, res) => {
+
+    try {
+
+        const resultado = await db.query(
+            `
+            SELECT *
+            FROM partidos
+            ORDER BY jornada_id, id
+            `
+        );
+
+        res.json(resultado.rows);
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error obteniendo partidos"
+        });
+
+    }
+
+};
 
 module.exports = {
+    obtenerTodosPartidos,
     obtenerPartidosPorJornada,
     crearPartido,
     crearPartidosLote,
+    editarPartido,
+    eliminarPartido,
     guardarPronostico,
     obtenerPronosticosUsuario,
     guardarPronosticosJornada,

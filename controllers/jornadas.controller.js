@@ -234,10 +234,12 @@ const cerrarJornada = async (req, res) => {
 
         await pool.query(
             `
-      UPDATE jornadas
-      SET fecha_cierre = NOW()
-      WHERE numero = $1
-      `,
+            UPDATE jornadas
+            SET
+                fecha_cierre = NOW(),
+                estado = 'cerrada'
+            WHERE numero = $1
+            `,
             [numero]
         );
 
@@ -264,21 +266,17 @@ const abrirJornada = async (req, res) => {
 
         const { numero } = req.params;
 
-        const nuevaFecha = new Date();
-
-        nuevaFecha.setHours(nuevaFecha.getHours() + 2);
-
         await pool.query(
             `
-      UPDATE jornadas
-      SET fecha_cierre = $1
-      WHERE numero = $2
-      `,
-            [nuevaFecha, numero]
+            UPDATE jornadas
+            SET estado = 'abierta'
+            WHERE numero = $1
+            `,
+            [numero]
         );
 
         res.json({
-            mensaje: "Jornada reabierta correctamente"
+            mensaje: "Jornada abierta correctamente"
         });
 
     } catch (error) {
@@ -286,7 +284,7 @@ const abrirJornada = async (req, res) => {
         console.error(error);
 
         res.status(500).json({
-            mensaje: "Error reabriendo jornada"
+            mensaje: "Error abriendo jornada"
         });
 
     }
