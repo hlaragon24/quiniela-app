@@ -68,8 +68,8 @@ const obtenerRankingGeneral = async (req, res) => {
 
         SUM(
           CASE
-            WHEN pr.marcador_local = p.marcador_local
-            AND pr.marcador_visitante = p.marcador_visitante
+            WHEN pr.marcador_local = p.local
+            AND pr.marcador_visitante = p.visitante
             THEN
               CASE
                 WHEN p.es_comodin = true THEN 3
