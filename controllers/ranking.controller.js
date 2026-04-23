@@ -65,22 +65,37 @@ const obtenerRankingGeneral = async (req, res) => {
         u.id,
         u.nombre,
 
-        COALESCE(SUM(
+
+        SUM(
           CASE
-            WHEN pr.acierto_marcador = true THEN
-              CASE WHEN p.es_comodin THEN 3 ELSE 2 END
+            WHEN pr.marcador_local = p.marcador_local
+            AND pr.marcador_visitante = p.marcador_visitante
+            THEN
+              CASE
+                WHEN p.es_comodin = true THEN 3
+                ELSE 2
+              END
             ELSE 0
           END
-        ),0) AS puntos_marcador,
+        ) AS puntos_marcador,
 
 
-        COALESCE(SUM(
+        SUM(
           CASE
-            WHEN pr.acierto_resultado = true THEN
-              CASE WHEN p.es_comodin THEN 2 ELSE 1 END
+            WHEN pr.resultado =
+              CASE
+                WHEN p.marcador_local > p.marcador_visitante THEN 'L'
+                WHEN p.marcador_local < p.marcador_visitante THEN 'V'
+                ELSE 'E'
+              END
+            THEN
+              CASE
+                WHEN p.es_comodin = true THEN 2
+                ELSE 1
+              END
             ELSE 0
           END
-        ),0) AS puntos_resultado,
+        ) AS puntos_resultado,
 
 
         COALESCE(SUM(pr.puntos),0) AS total
@@ -135,22 +150,37 @@ const obtenerRankingPorJornada = async (req, res) => {
         u.id,
         u.nombre,
 
-        COALESCE(SUM(
+
+        SUM(
           CASE
-            WHEN pr.acierto_marcador = true THEN
-              CASE WHEN p.es_comodin THEN 3 ELSE 2 END
+            WHEN pr.marcador_local = p.marcador_local
+            AND pr.marcador_visitante = p.marcador_visitante
+            THEN
+              CASE
+                WHEN p.es_comodin = true THEN 3
+                ELSE 2
+              END
             ELSE 0
           END
-        ),0) AS puntos_marcador,
+        ) AS puntos_marcador,
 
 
-        COALESCE(SUM(
+        SUM(
           CASE
-            WHEN pr.acierto_resultado = true THEN
-              CASE WHEN p.es_comodin THEN 2 ELSE 1 END
+            WHEN pr.resultado =
+              CASE
+                WHEN p.marcador_local > p.marcador_visitante THEN 'L'
+                WHEN p.marcador_local < p.marcador_visitante THEN 'V'
+                ELSE 'E'
+              END
+            THEN
+              CASE
+                WHEN p.es_comodin = true THEN 2
+                ELSE 1
+              END
             ELSE 0
           END
-        ),0) AS puntos_resultado,
+        ) AS puntos_resultado,
 
 
         COALESCE(SUM(pr.puntos),0) AS total
