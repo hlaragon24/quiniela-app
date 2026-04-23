@@ -4,7 +4,7 @@ const { SECRET } = require("../config/jwt");
 
 const verificarToken = (req, res, next) => {
 
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers["authorization"]
 
     if (!authHeader) {
 
