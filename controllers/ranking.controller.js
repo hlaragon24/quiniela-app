@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 
+
 const obtenerHistorialRanking = async (req, res) => {
 
     try {
