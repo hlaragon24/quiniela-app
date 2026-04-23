@@ -150,11 +150,10 @@ const obtenerRankingPorJornada = async (req, res) => {
         u.id,
         u.nombre,
 
-
         SUM(
           CASE
-            WHEN pr.marcador_local = p.local
-            AND pr.marcador_visitante = p.visitante
+            WHEN pr.marcador_local::int = p.local
+            AND pr.marcador_visitante::int = p.visitante
             THEN
               CASE
                 WHEN p.es_comodin = true THEN 3
@@ -167,7 +166,7 @@ const obtenerRankingPorJornada = async (req, res) => {
 
         SUM(
           CASE
-            WHEN pr.resultado =
+            WHEN pr.resultado::text =
               CASE
                 WHEN p.local > p.visitante THEN 'L'
                 WHEN p.local < p.visitante THEN 'V'
@@ -195,7 +194,8 @@ const obtenerRankingPorJornada = async (req, res) => {
         ON pr.partido_id = p.id
 
 
-      WHERE p.jornada_id = $1::int
+      WHERE p.jornada_id = $1
+
 
       GROUP BY u.id
 
