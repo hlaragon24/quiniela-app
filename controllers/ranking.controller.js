@@ -142,7 +142,7 @@ const obtenerRankingPorJornada = async (req, res) => {
 
   try {
 
-    const { jornada } = req.params;
+    const jornada = parseInt(req.params.jornada);
 
     const resultado = await pool.query(`
 
