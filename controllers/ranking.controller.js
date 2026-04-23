@@ -195,7 +195,7 @@ const obtenerRankingPorJornada = async (req, res) => {
         ON pr.partido_id = p.id
 
 
-      WHERE p.jornada_id = $1
+      WHERE p.jornada_id = $1::int
 
       GROUP BY u.id
 
