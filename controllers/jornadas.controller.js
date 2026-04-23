@@ -155,9 +155,48 @@ const obtenerEstadoJornada = async (req, res) => {
 
 };
 
+const obtenerUltimaJornada = async (req, res) => {
+
+    try {
+
+        const resultado = await pool.query(`
+            SELECT numero
+            FROM jornadas
+            ORDER BY numero DESC
+            LIMIT 1
+        `);
+
+        if (!resultado.rows.length) {
+
+            return res.json({
+                jornada: null
+            });
+
+        }
+
+        res.json({
+            jornada: resultado.rows[0].numero
+        });
+
+    }
+
+    catch (error) {
+
+        console.error("Error obtenerUltimaJornada:", error);
+
+        res.status(500).json({
+            mensaje: "Error obteniendo última jornada"
+        });
+
+    }
+
+};
+
+
 module.exports = {
     obtenerJornadaPorNumero,
     crearJornada,
     obtenerJornadas,
-    obtenerEstadoJornada
+    obtenerEstadoJornada,
+    obtenerUltimaJornada
 };

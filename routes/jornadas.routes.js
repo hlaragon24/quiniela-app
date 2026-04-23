@@ -9,20 +9,14 @@ const authMiddleware = require("../middleware/auth.middleware");
 const validarAdmin = require("../middleware/admin.middleware");
 
 
-router.get(
-    "/",
-    controller.obtenerJornadas
-);
+// ✅ endpoint última jornada (ANTES de /:numero)
+router.get("/ultima", controller.obtenerUltimaJornada);
 
-router.get(
-    "/:numero",
-    controller.obtenerJornadaPorNumero
-);
+router.get("/", controller.obtenerJornadas);
 
-router.get(
-    "/:numero/estado",
-    controller.obtenerEstadoJornada
-);
+router.get("/:numero", controller.obtenerJornadaPorNumero);
+
+router.get("/:numero/estado", controller.obtenerEstadoJornada);
 
 router.post(
     "/",
