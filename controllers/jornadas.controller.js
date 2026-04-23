@@ -112,46 +112,46 @@ const obtenerJornadas = async (req, res) => {
 
 const obtenerEstadoJornada = async (req, res) => {
 
-  try {
+    try {
 
-    const { numero } = req.params;
+        const { numero } = req.params;
 
-    const resultado = await pool.query(
-      `
+        const resultado = await pool.query(
+            `
       SELECT fecha_cierre
       FROM jornadas
       WHERE numero = $1
       `,
-      [numero]
-    );
+            [numero]
+        );
 
-    if (resultado.rows.length === 0) {
+        if (resultado.rows.length === 0) {
 
-      return res.status(404).json({
-        mensaje: "Jornada no encontrada"
-      });
+            return res.status(404).json({
+                mensaje: "Jornada no encontrada"
+            });
+
+        }
+
+        const fechaCierre = new Date(
+            resultado.rows[0].fecha_cierre
+        );
+
+        const ahora = new Date();
+
+        res.json({
+            abierta: ahora < fechaCierre
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error consultando estado jornada"
+        });
 
     }
-
-    const fechaCierre = new Date(
-      resultado.rows[0].fecha_cierre
-    );
-
-    const ahora = new Date();
-
-    res.json({
-      abierta: ahora < fechaCierre
-    });
-
-  } catch (error) {
-
-    console.error(error);
-
-    res.status(500).json({
-      mensaje: "Error consultando estado jornada"
-    });
-
-  }
 
 };
 
@@ -192,11 +192,147 @@ const obtenerUltimaJornada = async (req, res) => {
 
 };
 
+const actualizarJornada = async (req, res) => {
+
+    try {
+
+        const { numero } = req.params;
+
+        const { fecha_inicio, fecha_cierre } = req.body;
+
+        const resultado = await pool.query(
+            `
+      UPDATE jornadas
+      SET fecha_inicio = $1,
+          fecha_cierre = $2
+      WHERE numero = $3
+      RETURNING *
+      `,
+            [fecha_inicio, fecha_cierre, numero]
+        );
+
+        res.json(resultado.rows[0]);
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error actualizando jornada"
+        });
+
+    }
+
+};
+
+
+const cerrarJornada = async (req, res) => {
+
+    try {
+
+        const { numero } = req.params;
+
+        await pool.query(
+            `
+      UPDATE jornadas
+      SET fecha_cierre = NOW()
+      WHERE numero = $1
+      `,
+            [numero]
+        );
+
+        res.json({
+            mensaje: "Jornada cerrada correctamente"
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error cerrando jornada"
+        });
+
+    }
+
+};
+
+
+const abrirJornada = async (req, res) => {
+
+    try {
+
+        const { numero } = req.params;
+
+        const nuevaFecha = new Date();
+
+        nuevaFecha.setHours(nuevaFecha.getHours() + 2);
+
+        await pool.query(
+            `
+      UPDATE jornadas
+      SET fecha_cierre = $1
+      WHERE numero = $2
+      `,
+            [nuevaFecha, numero]
+        );
+
+        res.json({
+            mensaje: "Jornada reabierta correctamente"
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error reabriendo jornada"
+        });
+
+    }
+
+};
+
+
+const eliminarJornada = async (req, res) => {
+
+    try {
+
+        const { numero } = req.params;
+
+        await pool.query(
+            `
+      DELETE FROM jornadas
+      WHERE numero = $1
+      `,
+            [numero]
+        );
+
+        res.json({
+            mensaje: "Jornada eliminada correctamente"
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error eliminando jornada"
+        });
+
+    }
+
+};
+
 
 module.exports = {
     obtenerJornadaPorNumero,
     crearJornada,
     obtenerJornadas,
     obtenerEstadoJornada,
-    obtenerUltimaJornada
+    obtenerUltimaJornada,
+    actualizarJornada,
+    cerrarJornada,
+    abrirJornada,
+    eliminarJornada
 };

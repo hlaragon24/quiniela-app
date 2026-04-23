@@ -25,4 +25,32 @@ router.post(
     controller.crearJornada
 );
 
+router.put(
+  "/:numero",
+  authMiddleware,
+  validarAdmin,
+  controller.actualizarJornada
+);
+
+router.patch(
+  "/:numero/cerrar",
+  authMiddleware,
+  validarAdmin,
+  controller.cerrarJornada
+);
+
+router.patch(
+  "/:numero/abrir",
+  authMiddleware,
+  validarAdmin,
+  controller.abrirJornada
+);
+
+router.delete(
+  "/:numero",
+  authMiddleware,
+  validarAdmin,
+  controller.eliminarJornada
+);
+
 module.exports = router;
