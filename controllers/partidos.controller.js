@@ -5,22 +5,45 @@ console.log("TIPO DB:", typeof db);
 console.log("DB:", db);
 
 const obtenerPartidosPorJornada = async (req, res) => {
+
     try {
+
         const { jornadaId } = req.params;
 
         const resultado = await db.query(
-            "SELECT * FROM partidos WHERE jornada_id = $1 ORDER BY id",
+
+            `
+SELECT 
+p.*,
+r.goles_local,
+r.goles_visitante
+
+FROM partidos p
+
+LEFT JOIN resultados r
+ON r.partido_id = p.id
+
+WHERE p.jornada_id = $1
+
+ORDER BY p.id
+`,
             [jornadaId]
+
         );
 
         res.json(resultado.rows);
 
-    } catch (error) {
+    }
+    catch (error) {
+
         console.error(error);
+
         res.status(500).json({
             mensaje: "Error al obtener partidos"
         });
+
     }
+
 };
 
 
@@ -56,15 +79,15 @@ const crearPartido = async (req, res) => {
 
 const guardarPronosticosJornada = async (req, res) => {
 
-  const usuario_id = req.usuario.id;
-  const pronosticos = req.body;
+    const usuario_id = req.usuario.id;
+    const pronosticos = req.body;
 
-  try {
+    try {
 
-    for (const p of pronosticos) {
+        for (const p of pronosticos) {
 
-      await db.query(
-        `
+            await db.query(
+                `
         INSERT INTO pronosticos
         (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
 
@@ -77,30 +100,30 @@ const guardarPronosticosJornada = async (req, res) => {
           marcador_local = EXCLUDED.marcador_local,
           marcador_visitante = EXCLUDED.marcador_visitante
         `,
-        [
-          usuario_id,
-          p.partido_id,
-          p.resultado,
-          p.marcador_local,
-          p.marcador_visitante
-        ]
-      );
+                [
+                    usuario_id,
+                    p.partido_id,
+                    p.resultado,
+                    p.marcador_local,
+                    p.marcador_visitante
+                ]
+            );
+
+        }
+
+        res.json({
+            mensaje: "Pronósticos guardados correctamente"
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            mensaje: "Error guardando pronósticos"
+        });
 
     }
-
-    res.json({
-      mensaje: "Pronósticos guardados correctamente"
-    });
-
-  } catch (error) {
-
-    console.error(error);
-
-    res.status(500).json({
-      mensaje: "Error guardando pronósticos"
-    });
-
-  }
 
 };
 

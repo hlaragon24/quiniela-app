@@ -86,31 +86,34 @@ const crearJornada = async (req, res) => {
 
 const obtenerJornadas = async (req, res) => {
 
-  try {
+    try {
 
-    const result = await pool.query(`
-      SELECT *,
-      CASE
-        WHEN NOW() > fecha_cierre THEN 'cerrada'
-        ELSE 'abierta'
-      END AS estado
+        const result = await pool.query(`
+      SELECT
+        numero,
+        fecha_inicio,
+        fecha_cierre,
+        CASE
+          WHEN NOW() > fecha_cierre THEN 'cerrada'
+          ELSE 'abierta'
+        END AS estado
       FROM jornadas
       ORDER BY numero
     `);
 
-    res.json(result.rows);
+        res.json(result.rows);
 
-  }
+    }
 
-  catch (error) {
+    catch (error) {
 
-    console.error(error);
+        console.error(error);
 
-    res.status(500).json({
-      mensaje: "Error obteniendo jornadas"
-    });
+        res.status(500).json({
+            mensaje: "Error obteniendo jornadas"
+        });
 
-  }
+    }
 
 };
 
