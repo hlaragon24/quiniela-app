@@ -63,7 +63,7 @@ const guardarPronosticosJornada = async (req, res) => {
 
     for (const p of pronosticos) {
 
-      await pool.query(
+      await db.query(
         `
         INSERT INTO pronosticos
         (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
