@@ -1,8 +1,10 @@
 const db = require("../config/database");
-const { guardarPronostico, obtenerPronosticosUsuario } = require("./pronosticos.controller");
 
-console.log("TIPO DB:", typeof db);
-console.log("DB:", db);
+const {
+    guardarPronostico,
+    obtenerPronosticosUsuario
+} = require("./pronosticos.controller");
+
 
 const obtenerPartidosPorJornada = async (req, res) => {
 
@@ -11,30 +13,23 @@ const obtenerPartidosPorJornada = async (req, res) => {
         const { jornadaId } = req.params;
 
         const resultado = await db.query(
-
             `
-SELECT 
-p.*,
-r.goles_local,
-r.goles_visitante
-
-FROM partidos p
-
-LEFT JOIN resultados r
-ON r.partido_id = p.id
-
-WHERE p.jornada_id = $1
-
-ORDER BY p.id
-`,
+            SELECT 
+                p.*,
+                r.goles_local,
+                r.goles_visitante
+            FROM partidos p
+            LEFT JOIN resultados r
+            ON r.partido_id = p.id
+            WHERE p.jornada_id = $1
+            ORDER BY p.id
+            `,
             [jornadaId]
-
         );
 
         res.json(resultado.rows);
 
-    }
-    catch (error) {
+    } catch (error) {
 
         console.error(error);
 
@@ -48,7 +43,9 @@ ORDER BY p.id
 
 
 const crearPartido = async (req, res) => {
+
     try {
+
         const {
             jornada_id,
             local,
@@ -70,36 +67,38 @@ const crearPartido = async (req, res) => {
         res.json(resultado.rows[0]);
 
     } catch (error) {
+
         console.error(error);
+
         res.status(500).json({
             mensaje: "Error al crear partido"
         });
+
     }
+
 };
+
 
 const guardarPronosticosJornada = async (req, res) => {
 
-    const usuario_id = req.usuario.id;
-    const pronosticos = req.body;
-
     try {
+
+        const usuario_id = req.usuario.id;
+        const pronosticos = req.body;
 
         for (const p of pronosticos) {
 
             await db.query(
                 `
-        INSERT INTO pronosticos
-        (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
-
-        VALUES ($1,$2,$3,$4,$5)
-
-        ON CONFLICT (usuario_id, partido_id)
-
-        DO UPDATE SET
-          resultado = EXCLUDED.resultado,
-          marcador_local = EXCLUDED.marcador_local,
-          marcador_visitante = EXCLUDED.marcador_visitante
-        `,
+                INSERT INTO pronosticos
+                (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
+                VALUES ($1,$2,$3,$4,$5)
+                ON CONFLICT (usuario_id, partido_id)
+                DO UPDATE SET
+                    resultado = EXCLUDED.resultado,
+                    marcador_local = EXCLUDED.marcador_local,
+                    marcador_visitante = EXCLUDED.marcador_visitante
+                `,
                 [
                     usuario_id,
                     p.partido_id,
@@ -129,6 +128,7 @@ const guardarPronosticosJornada = async (req, res) => {
 
 
 const crearPartidosLote = async (req, res) => {
+
     try {
 
         const partidos = req.body;
@@ -149,6 +149,7 @@ const crearPartidosLote = async (req, res) => {
                     partido.es_comodin
                 ]
             );
+
         }
 
         res.json({
@@ -156,12 +157,17 @@ const crearPartidosLote = async (req, res) => {
         });
 
     } catch (error) {
+
         console.error(error);
+
         res.status(500).json({
             mensaje: "Error al crear partidos en lote"
         });
+
     }
+
 };
+
 
 const editarPartido = async (req, res) => {
 
@@ -213,6 +219,7 @@ const editarPartido = async (req, res) => {
 
 };
 
+
 const eliminarPartido = async (req, res) => {
 
     try {
@@ -242,6 +249,8 @@ const eliminarPartido = async (req, res) => {
     }
 
 };
+
+
 const obtenerTodosPartidos = async (req, res) => {
 
     try {
@@ -268,6 +277,7 @@ const obtenerTodosPartidos = async (req, res) => {
 
 };
 
+
 module.exports = {
     obtenerTodosPartidos,
     obtenerPartidosPorJornada,
@@ -277,5 +287,5 @@ module.exports = {
     eliminarPartido,
     guardarPronostico,
     obtenerPronosticosUsuario,
-    guardarPronosticosJornada,
+    guardarPronosticosJornada
 };
