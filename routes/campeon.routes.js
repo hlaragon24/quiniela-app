@@ -14,7 +14,7 @@ const {
 } = require("../controllers/campeon.controller");
 
 const verificarToken = require("../middleware/auth.middleware");
-const soloAdmin = require("../middleware/roles.middleware");
+const soloAdmin = require("../middleware/admin.middleware");
 
 /*
 ====================================
