@@ -68,14 +68,6 @@ const registrarResultado = async (req, res) => {
 
         const partido = partidoResult.rows[0];
 
-        if (partido.jornada_estado === "abierta") {
-            await client.query("ROLLBACK");
-
-            return res.status(403).json({
-                mensaje: "No puedes registrar resultados mientras la jornada está abierta"
-            });
-        }
-
         await client.query(
             `
       INSERT INTO resultados
