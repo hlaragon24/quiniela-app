@@ -255,10 +255,83 @@ const crearUsuario = async (req, res) => {
   }
 };
 
+const obtenerPerfilUsuario = async (req, res) => {
+  const usuarioId = req.usuario.id;
+
+  try {
+    const usuario = await pool.query(
+      `
+      SELECT
+        id,
+        nombre,
+        email,
+        created_at
+      FROM usuarios
+      WHERE id = $1
+      `,
+      [usuarioId]
+    );
+
+    if (usuario.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Usuario no encontrado"
+      });
+    }
+
+    const estadisticas = await pool.query(
+      `
+      SELECT
+        COUNT(pr.id) AS pronosticos_realizados,
+
+        COALESCE(SUM(
+          CASE
+            WHEN pr.puntos > 0
+            THEN 1
+            ELSE 0
+          END
+        ),0) AS aciertos,
+
+        COALESCE(SUM(
+          CASE
+            WHEN pr.puntos >= 2
+            THEN 1
+            ELSE 0
+          END
+        ),0) AS marcadores_exactos
+
+      FROM pronosticos pr
+      WHERE pr.usuario_id = $1
+      `,
+      [usuarioId]
+    );
+
+    return res.json({
+      ...usuario.rows[0],
+      pronosticosRealizados: Number(
+        estadisticas.rows[0].pronosticos_realizados
+      ),
+      aciertos: Number(
+        estadisticas.rows[0].aciertos
+      ),
+      marcadoresExactos: Number(
+        estadisticas.rows[0].marcadores_exactos
+      )
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      mensaje: "Error obteniendo perfil"
+    });
+  }
+};
+
 module.exports = {
   obtenerUsuarios,
   crearUsuario,
   actualizarRolUsuario,
   actualizarEstadoUsuario,
-  resetearPasswordUsuario
+  resetearPasswordUsuario,
+  obtenerPerfilUsuario
 };

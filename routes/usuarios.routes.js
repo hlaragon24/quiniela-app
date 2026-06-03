@@ -13,6 +13,11 @@ router.get(
   validarAdmin,
   controller.obtenerUsuarios
 );
+router.get(
+  "/perfil",
+  authMiddleware,
+  controller.obtenerPerfilUsuario
+);
 
 router.put(
   "/:id/rol",
@@ -40,5 +45,4 @@ router.post(
   validarAdmin,
   controller.crearUsuario
 );
-
 module.exports = router;

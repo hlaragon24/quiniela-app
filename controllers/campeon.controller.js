@@ -1,5 +1,10 @@
 const pool = require("../config/database");
 
+/*
+====================================
+UTILIDADES
+====================================
+*/
 const normalizarEquipo = (equipo) => {
   if (!equipo || typeof equipo !== "string") return null;
 
@@ -10,10 +15,27 @@ const normalizarEquipo = (equipo) => {
   return limpio;
 };
 
+const fechaValida = (fecha) => {
+  const parsed = new Date(fecha);
+  return !Number.isNaN(parsed.getTime());
+};
+
+const obtenerConfigCampeon = async () => {
+  const resultado = await pool.query(`
+    SELECT
+      id,
+      fecha_cierre,
+      NOW() >= fecha_cierre AS bloqueado
+    FROM campeon_config
+    WHERE id = 1
+  `);
+
+  return resultado.rows[0] || null;
+};
+
 /*
 ====================================
 REGISTRAR PRONÓSTICO DE CAMPEÓN
-Un usuario solo puede registrar uno
 ====================================
 */
 const registrarPronosticoCampeon = async (req, res) => {
@@ -33,6 +55,20 @@ const registrarPronosticoCampeon = async (req, res) => {
   }
 
   try {
+    const config = await obtenerConfigCampeon();
+
+    if (!config) {
+      return res.status(400).json({
+        mensaje: "El administrador aún no ha configurado la fecha de cierre para campeón"
+      });
+    }
+
+    if (config.bloqueado) {
+      return res.status(403).json({
+        mensaje: "El registro de campeón ya está cerrado"
+      });
+    }
+
     const campeonYaDeclarado = await pool.query(`
       SELECT id
       FROM campeon_real
@@ -134,7 +170,6 @@ const verMiPronosticoCampeon = async (req, res) => {
 /*
 ====================================
 ACTUALIZAR MI PRONÓSTICO DE CAMPEÓN
-Solo antes de declarar campeón real
 ====================================
 */
 const actualizarMiPronosticoCampeon = async (req, res) => {
@@ -154,6 +189,20 @@ const actualizarMiPronosticoCampeon = async (req, res) => {
   }
 
   try {
+    const config = await obtenerConfigCampeon();
+
+    if (!config) {
+      return res.status(400).json({
+        mensaje: "El administrador aún no ha configurado la fecha de cierre para campeón"
+      });
+    }
+
+    if (config.bloqueado) {
+      return res.status(403).json({
+        mensaje: "La modificación de campeón ya está cerrada"
+      });
+    }
+
     const campeonYaDeclarado = await pool.query(`
       SELECT id
       FROM campeon_real
@@ -206,7 +255,6 @@ const actualizarMiPronosticoCampeon = async (req, res) => {
 /*
 ====================================
 DECLARAR CAMPEÓN REAL
-Solo admin
 ====================================
 */
 const declararCampeonReal = async (req, res) => {
@@ -299,7 +347,6 @@ const declararCampeonReal = async (req, res) => {
 /*
 ====================================
 VER CAMPEÓN REAL
-Público
 ====================================
 */
 const verCampeonReal = async (req, res) => {
@@ -340,7 +387,6 @@ const verCampeonReal = async (req, res) => {
 /*
 ====================================
 VER RESUMEN DE CAMPEÓN
-Admin / ranking / dashboard
 ====================================
 */
 const verResumenCampeon = async (req, res) => {
@@ -379,11 +425,93 @@ const verResumenCampeon = async (req, res) => {
   }
 };
 
+/*
+====================================
+VER CONFIGURACIÓN DE CAMPEÓN
+====================================
+*/
+const verConfigCampeon = async (req, res) => {
+  try {
+    const config = await obtenerConfigCampeon();
+
+    if (!config) {
+      return res.json({
+        configurado: false,
+        fecha_cierre: null,
+        bloqueado: true
+      });
+    }
+
+    return res.json({
+      configurado: true,
+      fecha_cierre: config.fecha_cierre,
+      bloqueado: config.bloqueado
+    });
+
+  } catch (error) {
+    console.error("Error obteniendo configuración de campeón:", error);
+
+    return res.status(500).json({
+      mensaje: "Error obteniendo configuración de campeón"
+    });
+  }
+};
+
+/*
+====================================
+ACTUALIZAR CONFIGURACIÓN DE CAMPEÓN
+====================================
+*/
+const actualizarConfigCampeon = async (req, res) => {
+  const { fecha_cierre } = req.body;
+
+  if (!fechaValida(fecha_cierre)) {
+    return res.status(400).json({
+      mensaje: "Fecha de cierre inválida"
+    });
+  }
+
+  try {
+    const resultado = await pool.query(
+      `
+      INSERT INTO campeon_config (
+        id,
+        fecha_cierre
+      )
+      VALUES (1, $1)
+      ON CONFLICT (id)
+      DO UPDATE SET
+        fecha_cierre = EXCLUDED.fecha_cierre,
+        updated_at = NOW()
+      RETURNING
+        id,
+        fecha_cierre,
+        updated_at
+      `,
+      [fecha_cierre]
+    );
+
+    return res.json({
+      mensaje: "Fecha de cierre de campeón actualizada correctamente",
+      config: resultado.rows[0]
+    });
+
+  } catch (error) {
+    console.error("Error actualizando configuración de campeón:", error);
+
+    return res.status(500).json({
+      mensaje: "Error actualizando configuración de campeón"
+    });
+  }
+};
+
 module.exports = {
   registrarPronosticoCampeon,
   verMiPronosticoCampeon,
   actualizarMiPronosticoCampeon,
   declararCampeonReal,
   verCampeonReal,
-  verResumenCampeon
+  verResumenCampeon,
+  verConfigCampeon,
+  actualizarConfigCampeon
 };

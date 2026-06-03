@@ -8,7 +8,9 @@ const {
   actualizarMiPronosticoCampeon,
   declararCampeonReal,
   verCampeonReal,
-  verResumenCampeon
+  verResumenCampeon,
+  verConfigCampeon,
+  actualizarConfigCampeon
 } = require("../controllers/campeon.controller");
 
 const verificarToken = require("../middleware/auth.middleware");
@@ -64,6 +66,17 @@ router.get(
   verificarToken,
   soloAdmin,
   verResumenCampeon
+);
+router.get(
+  "/config",
+  verConfigCampeon
+);
+
+router.put(
+  "/admin/config",
+  verificarToken,
+  soloAdmin,
+  actualizarConfigCampeon
 );
 
 module.exports = router;
