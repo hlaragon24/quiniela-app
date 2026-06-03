@@ -1,7 +1,13 @@
+
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 
 const app = express();
+
+console.log("🔥 SERVER VERSION NUEVA 🔥");
+console.log("🌐 DATABASE_URL:", process.env.DATABASE_URL);
 
 app.use(cors());
 app.use(express.json());
@@ -17,6 +23,7 @@ const campeonRoutes = require("./routes/campeon.routes");
 const jornadasRoutes = require("./routes/jornadas.routes");
 const adminRoutes = require("./routes/admin.routes");
 const historicoRoutes = require("./routes/historico.routes");
+const usuariosRoutes = require("./routes/usuarios.routes");
 
 
 // Registrar rutas
@@ -29,6 +36,7 @@ app.use("/campeon", campeonRoutes);
 app.use("/jornadas", jornadasRoutes);
 app.use("/admin", adminRoutes);
 app.use("/historico", historicoRoutes); 
+app.use("/usuarios", usuariosRoutes);
 
 //
 

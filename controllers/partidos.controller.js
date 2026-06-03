@@ -1,11 +1,13 @@
 const db = require("../config/database");
 
-const {
-    guardarPronostico,
-    obtenerPronosticosUsuario
-} = require("./pronosticos.controller");
+console.log("🔥 CONTROLLER PARTIDOS CARGADO");
 
 
+/*
+====================================
+OBTENER PARTIDOS POR JORNADA
+====================================
+*/
 const obtenerPartidosPorJornada = async (req, res) => {
 
     try {
@@ -15,12 +17,8 @@ const obtenerPartidosPorJornada = async (req, res) => {
         const resultado = await db.query(
             `
             SELECT 
-                p.*,
-                r.goles_local,
-                r.goles_visitante
+                p.*
             FROM partidos p
-            LEFT JOIN resultados r
-            ON r.partido_id = p.id
             WHERE p.jornada_id = $1
             ORDER BY p.id
             `,
@@ -31,7 +29,7 @@ const obtenerPartidosPorJornada = async (req, res) => {
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Error obtenerPartidosPorJornada:", error);
 
         res.status(500).json({
             mensaje: "Error al obtener partidos"
@@ -42,6 +40,11 @@ const obtenerPartidosPorJornada = async (req, res) => {
 };
 
 
+/*
+====================================
+CREAR PARTIDO
+====================================
+*/
 const crearPartido = async (req, res) => {
 
     try {
@@ -68,7 +71,7 @@ const crearPartido = async (req, res) => {
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Error crearPartido:", error);
 
         res.status(500).json({
             mensaje: "Error al crear partido"
@@ -79,54 +82,11 @@ const crearPartido = async (req, res) => {
 };
 
 
-const guardarPronosticosJornada = async (req, res) => {
-
-    try {
-
-        const usuario_id = req.usuario.id;
-        const pronosticos = req.body;
-
-        for (const p of pronosticos) {
-
-            await db.query(
-                `
-                INSERT INTO pronosticos
-                (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
-                VALUES ($1,$2,$3,$4,$5)
-                ON CONFLICT (usuario_id, partido_id)
-                DO UPDATE SET
-                    resultado = EXCLUDED.resultado,
-                    marcador_local = EXCLUDED.marcador_local,
-                    marcador_visitante = EXCLUDED.marcador_visitante
-                `,
-                [
-                    usuario_id,
-                    p.partido_id,
-                    p.resultado,
-                    p.marcador_local,
-                    p.marcador_visitante
-                ]
-            );
-
-        }
-
-        res.json({
-            mensaje: "Pronósticos guardados correctamente"
-        });
-
-    } catch (error) {
-
-        console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error guardando pronósticos"
-        });
-
-    }
-
-};
-
-
+/*
+====================================
+CREAR PARTIDOS EN LOTE
+====================================
+*/
 const crearPartidosLote = async (req, res) => {
 
     try {
@@ -158,7 +118,7 @@ const crearPartidosLote = async (req, res) => {
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Error crearPartidosLote:", error);
 
         res.status(500).json({
             mensaje: "Error al crear partidos en lote"
@@ -169,6 +129,11 @@ const crearPartidosLote = async (req, res) => {
 };
 
 
+/*
+====================================
+EDITAR PARTIDO
+====================================
+*/
 const editarPartido = async (req, res) => {
 
     try {
@@ -209,7 +174,7 @@ const editarPartido = async (req, res) => {
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Error editarPartido:", error);
 
         res.status(500).json({
             mensaje: "Error editando partido"
@@ -220,6 +185,11 @@ const editarPartido = async (req, res) => {
 };
 
 
+/*
+====================================
+ELIMINAR PARTIDO
+====================================
+*/
 const eliminarPartido = async (req, res) => {
 
     try {
@@ -240,7 +210,7 @@ const eliminarPartido = async (req, res) => {
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Error eliminarPartido:", error);
 
         res.status(500).json({
             mensaje: "Error eliminando partido"
@@ -251,6 +221,11 @@ const eliminarPartido = async (req, res) => {
 };
 
 
+/*
+====================================
+OBTENER TODOS LOS PARTIDOS (ADMIN)
+====================================
+*/
 const obtenerTodosPartidos = async (req, res) => {
 
     try {
@@ -267,7 +242,7 @@ const obtenerTodosPartidos = async (req, res) => {
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Error obtenerTodosPartidos:", error);
 
         res.status(500).json({
             mensaje: "Error obteniendo partidos"
@@ -284,8 +259,5 @@ module.exports = {
     crearPartido,
     crearPartidosLote,
     editarPartido,
-    eliminarPartido,
-    guardarPronostico,
-    obtenerPronosticosUsuario,
-    guardarPronosticosJornada
+    eliminarPartido
 };

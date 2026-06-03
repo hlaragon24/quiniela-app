@@ -1,131 +1,99 @@
 const pool = require("../config/database");
 
-
 /*
 ====================================
-HISTORIAL RANKING
+HISTORIAL RANKING POR JORNADA
+Incluye usuarios con 0 puntos
 ====================================
 */
 const obtenerHistorialRanking = async (req, res) => {
-
   try {
-
     const resultado = await pool.query(`
       SELECT
         u.id,
         u.nombre,
-        p.jornada_id,
-        COALESCE(SUM(pr.puntos),0) AS puntos
+        j.id AS jornada_id,
+        j.numero AS jornada_numero,
+        COALESCE(SUM(pr.puntos), 0) AS puntos
       FROM usuarios u
-      LEFT JOIN pronosticos pr
-        ON u.id = pr.usuario_id
+
+      CROSS JOIN jornadas j
+
       LEFT JOIN partidos p
-        ON pr.partido_id = p.id
-      GROUP BY u.id, p.jornada_id
-      ORDER BY u.id, p.jornada_id
+        ON p.jornada_id = j.id
+
+      LEFT JOIN pronosticos pr
+        ON pr.usuario_id = u.id
+       AND pr.partido_id = p.id
+
+      GROUP BY
+        u.id,
+        u.nombre,
+        j.id,
+        j.numero
+
+      ORDER BY
+        j.numero ASC,
+        puntos DESC,
+        u.nombre ASC
     `);
 
-    res.json(resultado.rows);
+    return res.json(resultado.rows);
 
   } catch (error) {
+    console.error("Error obteniendo historial ranking:", error);
 
-    console.error(error);
-
-    res.status(500).json({
+    return res.status(500).json({
       mensaje: "Error obteniendo historial ranking"
     });
-
   }
-
 };
-
 
 /*
 ====================================
 RANKING GENERAL
+Incluye usuarios con 0 puntos
 ====================================
 */
 const obtenerRankingGeneral = async (req, res) => {
-
   try {
-
     const resultado = await pool.query(`
       SELECT
         u.id,
         u.nombre,
 
-        SUM(
+        COALESCE(SUM(pr.puntos), 0) AS total,
+
+        COUNT(pr.id) AS pronosticos_realizados,
+
+        COALESCE(SUM(
           CASE
-            WHEN pr.puntos >= 2 THEN pr.puntos
+            WHEN pr.puntos > 0 THEN 1
             ELSE 0
           END
-        ) AS puntos_marcador,
+        ), 0) AS aciertos,
 
-        SUM(
+        COALESCE(SUM(
           CASE
-            WHEN pr.puntos = 1 THEN pr.puntos
+            WHEN pr.marcador_local = r.goles_local
+             AND pr.marcador_visitante = r.goles_visitante
+            THEN 1
             ELSE 0
           END
-        ) AS puntos_resultado,
+        ), 0) AS marcadores_exactos,
 
-        COALESCE(SUM(pr.puntos),0) AS total
-
-      FROM usuarios u
-
-      LEFT JOIN pronosticos pr
-        ON u.id = pr.usuario_id
-
-      GROUP BY u.id
-
-      ORDER BY total DESC
-    `);
-
-    res.json(resultado.rows);
-
-  } catch (error) {
-
-    console.error(error);
-
-    res.status(500).json({
-      mensaje: "Error obteniendo ranking general"
-    });
-
-  }
-
-};
-
-
-/*
-====================================
-RANKING POR JORNADA
-====================================
-*/
-const obtenerRankingPorJornada = async (req, res) => {
-
-  try {
-
-    const jornada = parseInt(req.params.jornada);
-
-    const resultado = await pool.query(`
-      SELECT
-        u.id,
-        u.nombre,
-
-        SUM(
+        COALESCE(SUM(
           CASE
-            WHEN pr.puntos >= 2 THEN pr.puntos
+            WHEN pr.resultado =
+              CASE
+                WHEN r.goles_local > r.goles_visitante THEN 'L'
+                WHEN r.goles_visitante > r.goles_local THEN 'V'
+                ELSE 'E'
+              END
+            THEN 1
             ELSE 0
           END
-        ) AS puntos_marcador,
-
-        SUM(
-          CASE
-            WHEN pr.puntos = 1 THEN pr.puntos
-            ELSE 0
-          END
-        ) AS puntos_resultado,
-
-        COALESCE(SUM(pr.puntos),0) AS total
+        ), 0) AS resultados_correctos
 
       FROM usuarios u
 
@@ -135,32 +103,139 @@ const obtenerRankingPorJornada = async (req, res) => {
       LEFT JOIN partidos p
         ON pr.partido_id = p.id
 
-      WHERE p.jornada_id = $1
+      LEFT JOIN resultados r
+        ON p.id = r.partido_id
 
-      GROUP BY u.id
+      GROUP BY
+        u.id,
+        u.nombre
 
-      ORDER BY total DESC
-    `, [jornada]);
+      ORDER BY
+        total DESC,
+        marcadores_exactos DESC,
+        resultados_correctos DESC,
+        u.nombre ASC
+    `);
 
-    res.json(resultado.rows);
+    return res.json(resultado.rows);
 
   } catch (error) {
+    console.error("Error obteniendo ranking general:", error);
 
-    console.error(error);
-
-    res.status(500).json({
-      mensaje: "Error obteniendo ranking por jornada"
+    return res.status(500).json({
+      mensaje: "Error obteniendo ranking general"
     });
-
   }
-
 };
 
+/*
+====================================
+RANKING POR JORNADA
+Incluye usuarios con 0 puntos
+====================================
+*/
+const obtenerRankingPorJornada = async (req, res) => {
+  const jornada_id = Number(req.params.jornada);
+
+  if (!Number.isInteger(jornada_id) || jornada_id <= 0) {
+    return res.status(400).json({
+      mensaje: "ID de jornada inválido"
+    });
+  }
+
+  try {
+    const jornadaExiste = await pool.query(
+      `
+      SELECT id, numero, estado
+      FROM jornadas
+      WHERE id = $1
+      `,
+      [jornada_id]
+    );
+
+    if (jornadaExiste.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Jornada no encontrada"
+      });
+    }
+
+    const resultado = await pool.query(`
+      SELECT
+        u.id,
+        u.nombre,
+
+        COALESCE(SUM(pr.puntos), 0) AS total,
+
+        COUNT(pr.id) AS pronosticos_realizados,
+
+        COALESCE(SUM(
+          CASE
+            WHEN pr.puntos > 0 THEN 1
+            ELSE 0
+          END
+        ), 0) AS aciertos,
+
+        COALESCE(SUM(
+          CASE
+            WHEN pr.marcador_local = r.goles_local
+             AND pr.marcador_visitante = r.goles_visitante
+            THEN 1
+            ELSE 0
+          END
+        ), 0) AS marcadores_exactos,
+
+        COALESCE(SUM(
+          CASE
+            WHEN pr.resultado =
+              CASE
+                WHEN r.goles_local > r.goles_visitante THEN 'L'
+                WHEN r.goles_visitante > r.goles_local THEN 'V'
+                ELSE 'E'
+              END
+            THEN 1
+            ELSE 0
+          END
+        ), 0) AS resultados_correctos
+
+      FROM usuarios u
+
+      LEFT JOIN pronosticos pr
+        ON u.id = pr.usuario_id
+
+      LEFT JOIN partidos p
+        ON pr.partido_id = p.id
+       AND p.jornada_id = $1
+
+      LEFT JOIN resultados r
+        ON p.id = r.partido_id
+
+      GROUP BY
+        u.id,
+        u.nombre
+
+      ORDER BY
+        total DESC,
+        marcadores_exactos DESC,
+        resultados_correctos DESC,
+        u.nombre ASC
+    `, [jornada_id]);
+
+    return res.json({
+      jornada: jornadaExiste.rows[0],
+      ranking: resultado.rows
+    });
+
+  } catch (error) {
+    console.error("Error obteniendo ranking por jornada:", error);
+
+    return res.status(500).json({
+      mensaje: "Error obteniendo ranking por jornada"
+    });
+  }
+};
 
 module.exports = {
-
   obtenerRankingGeneral,
   obtenerRankingPorJornada,
   obtenerHistorialRanking
-
 };

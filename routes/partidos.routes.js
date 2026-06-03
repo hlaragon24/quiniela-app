@@ -5,7 +5,6 @@ const router = express.Router();
 const controller = require("../controllers/partidos.controller");
 
 const authMiddleware = require("../middleware/auth.middleware");
-
 const validarAdmin = require("../middleware/admin.middleware");
 
 
@@ -14,7 +13,6 @@ const validarAdmin = require("../middleware/admin.middleware");
 OBTENER TODOS LOS PARTIDOS (ADMIN)
 ====================================
 */
-
 router.get(
     "/",
     authMiddleware,
@@ -28,7 +26,6 @@ router.get(
 OBTENER PARTIDOS POR JORNADA
 ====================================
 */
-
 router.get(
     "/:jornadaId",
     controller.obtenerPartidosPorJornada
@@ -40,7 +37,6 @@ router.get(
 CREAR PARTIDO
 ====================================
 */
-
 router.post(
     "/",
     authMiddleware,
@@ -54,7 +50,6 @@ router.post(
 CREAR PARTIDOS EN LOTE
 ====================================
 */
-
 router.post(
     "/lote",
     authMiddleware,
@@ -68,7 +63,6 @@ router.post(
 EDITAR PARTIDO
 ====================================
 */
-
 router.put(
     "/:id",
     authMiddleware,
@@ -82,7 +76,6 @@ router.put(
 ELIMINAR PARTIDO
 ====================================
 */
-
 router.delete(
     "/:id",
     authMiddleware,

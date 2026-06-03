@@ -19,5 +19,10 @@ router.get(
   controller.obtenerPronosticosUsuario
 );
 
+router.get(
+  "/usuario/:jornadaId",
+  authMiddleware,
+  controller.obtenerPronosticosUsuarioPorJornada
+);
 
 module.exports = router;

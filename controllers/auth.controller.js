@@ -84,6 +84,12 @@ const login = async (req, res) => {
 
         const usuario = resultado.rows[0];
 
+        if (usuario.activo === false) {
+            return res.status(403).json({
+                mensaje: "Usuario desactivado"
+            });
+        }
+
         // Validar password
         const passwordValido = await bcrypt.compare(
             password,

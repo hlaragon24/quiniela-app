@@ -1,13 +1,25 @@
-
 const pool = require("../config/database");
-
 
 /*
 ====================================
-GUARDAR PRONÓSTICO
+UTILIDADES
+====================================
+*/
+const resultadosValidos = ["L", "E", "V"];
+
+const esEnteroNoNegativo = (valor) => {
+    const numero = Number(valor);
+    return Number.isInteger(numero) && numero >= 0;
+};
+
+/*
+====================================
+GUARDAR PRONÓSTICO INDIVIDUAL
+Bloqueo por jornada: fecha_cierre
 ====================================
 */
 const guardarPronostico = async (req, res) => {
+    const usuario_id = req.usuario.id;
 
     const {
         partido_id,
@@ -16,71 +28,263 @@ const guardarPronostico = async (req, res) => {
         marcador_visitante
     } = req.body;
 
-    const usuario_id = req.usuario.id;
+    if (
+        !partido_id ||
+        !resultadosValidos.includes(resultado) ||
+        !esEnteroNoNegativo(marcador_local) ||
+        !esEnteroNoNegativo(marcador_visitante)
+    ) {
+        return res.status(400).json({
+            mensaje: "Datos de pronóstico inválidos"
+        });
+    }
+
+    const client = await pool.connect();
 
     try {
+        await client.query("BEGIN");
 
-        // Validar resultado permitido
-        const resultadosValidos = ["L", "E", "V"];
-
-        if (!resultadosValidos.includes(resultado)) {
-
-            return res.status(400).json({
-                mensaje: "Resultado inválido. Solo se permite L, E o V"
-            });
-
-        }
-
-
-        // Verificar si ya existe pronóstico del usuario para ese partido
-        const existe = await pool.query(
-            `SELECT * FROM pronosticos
-             WHERE usuario_id = $1
-             AND partido_id = $2`,
-            [usuario_id, partido_id]
+        const partidoResult = await client.query(
+            `
+      SELECT
+        p.id,
+        p.jornada_id,
+        j.estado,
+        j.fecha_cierre
+      FROM partidos p
+      JOIN jornadas j
+        ON p.jornada_id = j.id
+      WHERE p.id = $1
+      `,
+            [partido_id]
         );
 
+        if (partidoResult.rows.length === 0) {
+            await client.query("ROLLBACK");
 
-        if (existe.rows.length > 0) {
-
-            return res.status(400).json({
-                mensaje: "Ya registraste pronóstico para este partido"
+            return res.status(404).json({
+                mensaje: "Partido no encontrado"
             });
-
         }
 
+        const partido = partidoResult.rows[0];
 
-        // Guardar pronóstico
-        await pool.query(
-            `INSERT INTO pronosticos
-             (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
-             VALUES ($1, $2, $3, $4, $5)`,
+        if (partido.estado !== "abierta") {
+            await client.query("ROLLBACK");
+
+            return res.status(403).json({
+                mensaje: "La jornada no está abierta"
+            });
+        }
+
+        const bloqueoResult = await client.query(
+            `
+      SELECT NOW() >= $1::timestamp AS bloqueada
+      `,
+            [partido.fecha_cierre]
+        );
+
+        if (bloqueoResult.rows[0].bloqueada) {
+            await client.query("ROLLBACK");
+
+            return res.status(403).json({
+                mensaje: "La jornada ya está bloqueada. No puedes guardar ni modificar pronósticos."
+            });
+        }
+
+        await client.query(
+            `
+      INSERT INTO pronosticos
+        (
+          usuario_id,
+          partido_id,
+          resultado,
+          marcador_local,
+          marcador_visitante
+        )
+      VALUES
+        ($1, $2, $3, $4, $5)
+      ON CONFLICT (usuario_id, partido_id)
+      DO UPDATE SET
+        resultado = EXCLUDED.resultado,
+        marcador_local = EXCLUDED.marcador_local,
+        marcador_visitante = EXCLUDED.marcador_visitante,
+        updated_at = NOW()
+      `,
             [
                 usuario_id,
                 partido_id,
                 resultado,
-                marcador_local,
-                marcador_visitante
+                Number(marcador_local),
+                Number(marcador_visitante)
             ]
         );
 
+        await client.query("COMMIT");
 
-        res.json({
+        return res.json({
             mensaje: "Pronóstico guardado correctamente"
         });
 
     } catch (error) {
+        await client.query("ROLLBACK");
 
-        console.error(error);
+        console.error("Error guardando pronóstico:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             mensaje: "Error guardando pronóstico"
         });
 
+    } finally {
+        client.release();
     }
-
 };
 
+/*
+====================================
+GUARDAR PRONÓSTICOS POR JORNADA
+Bloqueo por jornada: fecha_cierre
+====================================
+*/
+const guardarPronosticosJornada = async (req, res) => {
+    const usuario_id = req.usuario.id;
+    const pronosticos = req.body;
+
+    if (!Array.isArray(pronosticos) || pronosticos.length === 0) {
+        return res.status(400).json({
+            mensaje: "Debes enviar al menos un pronóstico"
+        });
+    }
+
+    for (const p of pronosticos) {
+        if (
+            !p.partido_id ||
+            !resultadosValidos.includes(p.resultado) ||
+            !esEnteroNoNegativo(p.marcador_local) ||
+            !esEnteroNoNegativo(p.marcador_visitante)
+        ) {
+            return res.status(400).json({
+                mensaje: "Uno o más pronósticos tienen datos inválidos"
+            });
+        }
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const idsPartidos = pronosticos.map((p) => Number(p.partido_id));
+
+        const partidosResult = await client.query(
+            `
+      SELECT
+        p.id,
+        p.jornada_id,
+        j.estado,
+        j.fecha_cierre
+      FROM partidos p
+      JOIN jornadas j
+        ON p.jornada_id = j.id
+      WHERE p.id = ANY($1::int[])
+      `,
+            [idsPartidos]
+        );
+
+        if (partidosResult.rows.length !== idsPartidos.length) {
+            await client.query("ROLLBACK");
+
+            return res.status(404).json({
+                mensaje: "Uno o más partidos no existen"
+            });
+        }
+
+        const jornadasIds = [
+            ...new Set(partidosResult.rows.map((p) => p.jornada_id))
+        ];
+
+        if (jornadasIds.length !== 1) {
+            await client.query("ROLLBACK");
+
+            return res.status(400).json({
+                mensaje: "Todos los pronósticos deben pertenecer a la misma jornada"
+            });
+        }
+
+        const jornada = partidosResult.rows[0];
+
+        if (jornada.estado !== "abierta") {
+            await client.query("ROLLBACK");
+
+            return res.status(403).json({
+                mensaje: "La jornada no está abierta"
+            });
+        }
+
+        const bloqueoResult = await client.query(
+            `
+      SELECT NOW() >= $1::timestamp AS bloqueada
+      `,
+            [jornada.fecha_cierre]
+        );
+
+        if (bloqueoResult.rows[0].bloqueada) {
+            await client.query("ROLLBACK");
+
+            return res.status(403).json({
+                mensaje: "La jornada ya está bloqueada. No puedes guardar ni modificar pronósticos."
+            });
+        }
+
+        for (const p of pronosticos) {
+            await client.query(
+                `
+        INSERT INTO pronosticos
+          (
+            usuario_id,
+            partido_id,
+            resultado,
+            marcador_local,
+            marcador_visitante
+          )
+        VALUES
+          ($1, $2, $3, $4, $5)
+        ON CONFLICT (usuario_id, partido_id)
+        DO UPDATE SET
+          resultado = EXCLUDED.resultado,
+          marcador_local = EXCLUDED.marcador_local,
+          marcador_visitante = EXCLUDED.marcador_visitante,
+          updated_at = NOW()
+        `,
+                [
+                    usuario_id,
+                    Number(p.partido_id),
+                    p.resultado,
+                    Number(p.marcador_local),
+                    Number(p.marcador_visitante)
+                ]
+            );
+        }
+
+        await client.query("COMMIT");
+
+        return res.json({
+            mensaje: "Pronósticos guardados correctamente"
+        });
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+
+        console.error("Error guardando pronósticos:", error);
+
+        return res.status(500).json({
+            mensaje: "Error guardando pronósticos"
+        });
+
+    } finally {
+        client.release();
+    }
+};
 
 /*
 ====================================
@@ -88,117 +292,118 @@ VER PRONÓSTICOS DEL USUARIO
 ====================================
 */
 const obtenerPronosticosUsuario = async (req, res) => {
+    const usuario_id = req.usuario.id;
 
     try {
+        const resultado = await pool.query(
+            `
+      SELECT
+        p.id AS partido_id,
+        p.local,
+        p.visitante,
+        p.es_comodin,
+        p.jornada_id,
 
-        const usuarioId = req.usuario.id;
+        j.numero AS jornada_numero,
+        j.estado AS jornada_estado,
+        j.fecha_inicio,
+        j.fecha_cierre,
 
+        r.goles_local,
+        r.goles_visitante,
+
+        pr.resultado AS pronostico_usuario,
+        pr.marcador_local,
+        pr.marcador_visitante,
+        pr.puntos,
+        pr.created_at,
+        pr.updated_at,
+
+        CASE
+          WHEN NOW() >= j.fecha_cierre THEN true
+          ELSE false
+        END AS jornada_bloqueada
+
+      FROM pronosticos pr
+
+      JOIN partidos p
+        ON pr.partido_id = p.id
+
+      JOIN jornadas j
+        ON p.jornada_id = j.id
+
+      LEFT JOIN resultados r
+        ON p.id = r.partido_id
+
+      WHERE pr.usuario_id = $1
+
+      ORDER BY j.numero, p.id
+      `,
+            [usuario_id]
+        );
+
+        return res.json(resultado.rows);
+
+    } catch (error) {
+        console.error("Error obteniendo pronósticos usuario:", error);
+
+        return res.status(500).json({
+            mensaje: "Error obteniendo pronósticos usuario"
+        });
+    }
+};
+
+/*
+====================================
+VER PRONÓSTICOS DEL USUARIO POR JORNADA
+====================================
+*/
+const obtenerPronosticosUsuarioPorJornada = async (req, res) => {
+    const usuario_id = req.usuario.id;
+    const { jornadaId } = req.params;
+
+    try {
         const resultado = await pool.query(
             `
             SELECT
-                partidos.id,
-                partidos.local,
-                partidos.visitante,
-                partidos.es_comodin,
-                partidos.jornada_id,
+                p.id AS partido_id,
+                p.local,
+                p.visitante,
+                p.es_comodin,
+                p.jornada_id,
 
-                resultados.goles_local,
-                resultados.goles_visitante,
+                pr.resultado AS pronostico_usuario,
+                pr.marcador_local,
+                pr.marcador_visitante,
+                pr.puntos
 
-                pronosticos.resultado AS pronostico_usuario,
-                pronosticos.marcador_local,
-                pronosticos.marcador_visitante,
-                pronosticos.puntos
+            FROM pronosticos pr
 
-            FROM pronosticos
+            JOIN partidos p
+                ON pr.partido_id = p.id
 
-            JOIN partidos
-                ON pronosticos.partido_id = partidos.id
+            WHERE pr.usuario_id = $1
+            AND p.jornada_id = $2
 
-            LEFT JOIN resultados
-                ON partidos.id = resultados.partido_id
-
-            WHERE pronosticos.usuario_id = $1
-
-            ORDER BY partidos.id
+            ORDER BY p.id
             `,
-            [usuarioId]
+            [usuario_id, jornadaId]
         );
 
-        res.json(resultado.rows);
+        return res.json(resultado.rows);
 
     } catch (error) {
+        console.error("Error obteniendo pronósticos por jornada:", error);
 
-        console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error obteniendo pronósticos usuario"
+        return res.status(500).json({
+            mensaje: "Error obteniendo pronósticos por jornada"
         });
-
     }
-
 };
-
-const guardarPronosticosJornada = async (req, res) => {
-
-  console.log("usuario:", req.usuario);
-  console.log("body:", req.body);
-
-  const usuario_id = req.usuario.id;
-
-  const pronosticos = req.body;
-
-  try {
-
-    for (const p of pronosticos) {
-
-      await pool.query(
-
-        `
-        INSERT INTO pronosticos
-        (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
-
-        VALUES ($1,$2,$3,$4,$5)
-
-        ON CONFLICT (usuario_id, partido_id)
-
-        DO UPDATE SET
-          resultado = EXCLUDED.resultado,
-          marcador_local = EXCLUDED.marcador_local,
-          marcador_visitante = EXCLUDED.marcador_visitante
-        `,
-
-        [
-          usuario_id,
-          p.partido_id,
-          p.resultado,
-          p.marcador_local,
-          p.marcador_visitante
-        ]
-
-      );
-
-    }
-
-    res.json({
-      mensaje: "Pronósticos guardados correctamente"
-    });
-
-  } catch (error) {
-
-    console.error(error);
-
-    res.status(500).json({
-      mensaje: "Error guardando pronósticos"
-    });
-
-  }
-
-};
-
 
 module.exports = {
-  guardarPronostico,
-  obtenerPronosticosUsuario,
-  guardarPronosticosJornada
+    guardarPronostico,
+    obtenerPronosticosUsuario,
+    guardarPronosticosJornada,
+    obtenerPronosticosUsuarioPorJornada
 };
