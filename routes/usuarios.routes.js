@@ -34,5 +34,11 @@ router.put(
   validarAdmin,
   controller.resetearPasswordUsuario
 );
+router.post(
+  "/",
+  authMiddleware,
+  validarAdmin,
+  controller.crearUsuario
+);
 
 module.exports = router;

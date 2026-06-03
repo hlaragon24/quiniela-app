@@ -149,8 +149,70 @@ const resetearPasswordUsuario = async (req, res) => {
   }
 };
 
+const crearUsuario = async (req, res) => {
+  const { nombre, email, password, rol } = req.body;
+
+  const rolesValidos = ["admin", "jugador"];
+
+  if (!nombre || !email || !password || !rol) {
+    return res.status(400).json({
+      mensaje: "Todos los campos son obligatorios"
+    });
+  }
+
+  if (!rolesValidos.includes(rol)) {
+    return res.status(400).json({
+      mensaje: "Rol inválido"
+    });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({
+      mensaje: "La contraseña debe tener al menos 6 caracteres"
+    });
+  }
+
+  try {
+    const existe = await pool.query(
+      "SELECT id FROM usuarios WHERE email = $1",
+      [email]
+    );
+
+    if (existe.rows.length > 0) {
+      return res.status(400).json({
+        mensaje: "Ya existe un usuario con ese email"
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const resultado = await pool.query(
+      `
+      INSERT INTO usuarios
+        (nombre, email, password, rol, activo)
+      VALUES
+        ($1, $2, $3, $4, true)
+      RETURNING id, nombre, email, rol, activo
+      `,
+      [nombre, email, passwordHash, rol]
+    );
+
+    res.json({
+      mensaje: "Usuario creado correctamente",
+      usuario: resultado.rows[0]
+    });
+  } catch (error) {
+    console.error("Error creando usuario:", error);
+
+    res.status(500).json({
+      mensaje: "Error creando usuario"
+    });
+  }
+};
+
 module.exports = {
   obtenerUsuarios,
+  createarUsuario,
   actualizarRolUsuario,
   actualizarEstadoUsuario,
   resetearPasswordUsuario
