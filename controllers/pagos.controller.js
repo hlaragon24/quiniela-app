@@ -1,8 +1,8 @@
 const pool = require("../config/database");
 
 const obtenerPagos = async (req, res) => {
-  try {
-    const resultado = await pool.query(`
+    try {
+        const resultado = await pool.query(`
       SELECT
         u.id AS usuario_id,
         u.nombre,
@@ -29,72 +29,72 @@ const obtenerPagos = async (req, res) => {
         u.nombre ASC
     `);
 
-    return res.json(resultado.rows);
+        return res.json(resultado.rows);
 
-  } catch (error) {
-    console.error("Error obteniendo pagos:", error);
+    } catch (error) {
+        console.error("Error obteniendo pagos:", error);
 
-    return res.status(500).json({
-      mensaje: "Error obteniendo pagos"
-    });
-  }
+        return res.status(500).json({
+            mensaje: "Error obteniendo pagos"
+        });
+    }
 };
 
 const guardarPago = async (req, res) => {
-  const usuarioId = Number(req.params.usuarioId);
-  const adminId = req.usuario?.id;
+    const usuarioId = Number(req.params.usuarioId);
+    const adminId = req.usuario?.id;
 
-  const {
-    monto,
-    pagado,
-    fecha_pago,
-    metodo_pago,
-    notas
-  } = req.body;
+    const {
+        monto,
+        pagado,
+        fecha_pago,
+        metodo_pago,
+        notas
+    } = req.body;
 
-  if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
-    return res.status(400).json({
-      mensaje: "ID de usuario inválido"
-    });
-  }
+    if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+        return res.status(400).json({
+            mensaje: "ID de usuario inválido"
+        });
+    }
 
-  const montoNumero = Number(monto ?? 0);
+    const montoNumero = Number(monto ?? 0);
 
-  if (!Number.isFinite(montoNumero) || montoNumero < 0) {
-    return res.status(400).json({
-      mensaje: "Monto inválido"
-    });
-  }
+    if (!Number.isFinite(montoNumero) || montoNumero < 0) {
+        return res.status(400).json({
+            mensaje: "Monto inválido"
+        });
+    }
 
-  if (typeof pagado !== "boolean") {
-    return res.status(400).json({
-      mensaje: "Estado de pago inválido"
-    });
-  }
+    if (typeof pagado !== "boolean") {
+        return res.status(400).json({
+            mensaje: "Estado de pago inválido"
+        });
+    }
 
-  try {
-    const usuario = await pool.query(
-      `
+    try {
+        const usuario = await pool.query(
+            `
       SELECT id
       FROM usuarios
       WHERE id = $1
       AND rol = 'jugador'
       `,
-      [usuarioId]
-    );
+            [usuarioId]
+        );
 
-    if (usuario.rows.length === 0) {
-      return res.status(404).json({
-        mensaje: "Jugador no encontrado"
-      });
-    }
+        if (usuario.rows.length === 0) {
+            return res.status(404).json({
+                mensaje: "Jugador no encontrado"
+            });
+        }
 
-    const fechaPagoFinal = pagado
-      ? fecha_pago || new Date()
-      : null;
+        const fechaPagoFinal = pagado
+            ? fecha_pago || new Date()
+            : null;
 
-    const resultado = await pool.query(
-      `
+        const resultado = await pool.query(
+            `
       INSERT INTO pagos_quiniela (
         usuario_id,
         monto,
@@ -126,32 +126,78 @@ const guardarPago = async (req, res) => {
         notas,
         updated_at
       `,
-      [
-        usuarioId,
-        montoNumero,
-        pagado,
-        fechaPagoFinal,
-        metodo_pago || null,
-        notas || null,
-        adminId
-      ]
-    );
+            [
+                usuarioId,
+                montoNumero,
+                pagado,
+                fechaPagoFinal,
+                metodo_pago || null,
+                notas || null,
+                adminId
+            ]
+        );
 
-    return res.json({
-      mensaje: "Pago actualizado correctamente",
-      pago: resultado.rows[0]
-    });
+        return res.json({
+            mensaje: "Pago actualizado correctamente",
+            pago: resultado.rows[0]
+        });
 
-  } catch (error) {
-    console.error("Error guardando pago:", error);
+    } catch (error) {
+        console.error("Error guardando pago:", error);
 
-    return res.status(500).json({
-      mensaje: "Error guardando pago"
-    });
-  }
+        return res.status(500).json({
+            mensaje: "Error guardando pago"
+        });
+    }
+};
+const obtenerMiPago = async (req, res) => {
+    const usuarioId = req.usuario?.id;
+
+    if (!usuarioId) {
+        return res.status(401).json({
+            mensaje: "Usuario no autenticado"
+        });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `
+      SELECT
+        u.id AS usuario_id,
+        u.nombre,
+        u.email,
+        COALESCE(p.monto, 0) AS monto,
+        COALESCE(p.pagado, false) AS pagado,
+        p.fecha_pago,
+        p.metodo_pago,
+        p.notas
+      FROM usuarios u
+      LEFT JOIN pagos_quiniela p
+        ON p.usuario_id = u.id
+      WHERE u.id = $1
+      `,
+            [usuarioId]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({
+                mensaje: "Usuario no encontrado"
+            });
+        }
+
+        return res.json(resultado.rows[0]);
+
+    } catch (error) {
+        console.error("Error obteniendo mi pago:", error);
+
+        return res.status(500).json({
+            mensaje: "Error obteniendo mi pago"
+        });
+    }
 };
 
 module.exports = {
-  obtenerPagos,
-  guardarPago
+    obtenerPagos,
+    guardarPago,
+    obtenerMiPago
 };

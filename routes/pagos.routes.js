@@ -8,17 +8,22 @@ const authMiddleware = require("../middleware/auth.middleware");
 const validarAdmin = require("../middleware/admin.middleware");
 
 router.get(
-  "/",
-  authMiddleware,
-  validarAdmin,
-  controller.obtenerPagos
+    "/",
+    authMiddleware,
+    validarAdmin,
+    controller.obtenerPagos
+);
+router.get(
+    "/mi-pago",
+    authMiddleware,
+    controller.obtenerMiPago
 );
 
 router.put(
-  "/:usuarioId",
-  authMiddleware,
-  validarAdmin,
-  controller.guardarPago
+    "/:usuarioId",
+    authMiddleware,
+    validarAdmin,
+    controller.guardarPago
 );
 
 module.exports = router;
