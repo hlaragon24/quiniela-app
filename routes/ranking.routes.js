@@ -11,6 +11,11 @@ router.get(
 );
 
 router.get(
+  "/general",
+  controller.obtenerRankingGeneral
+);
+
+router.get(
   "/mi-resumen",
   verificarToken,
   controller.obtenerMiResumenRanking

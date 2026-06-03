@@ -2,16 +2,78 @@ const pool = require("../config/database");
 
 /*
 ====================================
-QUERY BASE: PUNTOS POR JORNADAS + CAMPEÓN
+QUERY BASE: TABLA GENERAL
+====================================
+Reglas:
+- Pronóstico correcto base: 1 punto
+- Marcador exacto base: 2 puntos
+- Comodín agrega +1 al pronóstico correcto
+- Comodín agrega +1 al marcador exacto
+- Campeón suma puntos aparte
 ====================================
 */
 const obtenerRankingGeneralBase = `
-  WITH puntos_jornadas AS (
+  WITH campeon_actual AS (
+    SELECT
+      equipo,
+      puntos
+    FROM campeon_real
+    ORDER BY id DESC
+    LIMIT 1
+  ),
+
+  puntos_jornadas AS (
     SELECT
       u.id AS usuario_id,
       u.nombre,
 
-      COALESCE(SUM(pr.puntos), 0) AS puntos_jornadas,
+      COALESCE(SUM(
+        CASE
+          WHEN r.partido_id IS NOT NULL
+           AND pr.resultado =
+            CASE
+              WHEN r.goles_local > r.goles_visitante THEN 'L'
+              WHEN r.goles_visitante > r.goles_local THEN 'V'
+              ELSE 'E'
+            END
+          THEN 1
+          ELSE 0
+        END
+      ), 0) AS puntos_pronostico,
+
+      COALESCE(SUM(
+        CASE
+          WHEN r.partido_id IS NOT NULL
+           AND pr.marcador_local = r.goles_local
+           AND pr.marcador_visitante = r.goles_visitante
+          THEN 2
+          ELSE 0
+        END
+      ), 0) AS puntos_marcador,
+
+      COALESCE(SUM(
+        CASE
+          WHEN r.partido_id IS NOT NULL
+           AND p.es_comodin = true
+           AND pr.resultado =
+            CASE
+              WHEN r.goles_local > r.goles_visitante THEN 'L'
+              WHEN r.goles_visitante > r.goles_local THEN 'V'
+              ELSE 'E'
+            END
+          THEN 1
+          ELSE 0
+        END
+        +
+        CASE
+          WHEN r.partido_id IS NOT NULL
+           AND p.es_comodin = true
+           AND pr.marcador_local = r.goles_local
+           AND pr.marcador_visitante = r.goles_visitante
+          THEN 1
+          ELSE 0
+        END
+      ), 0) AS puntos_comodin,
 
       COUNT(pr.id) AS pronosticos_realizados,
 
@@ -24,7 +86,8 @@ const obtenerRankingGeneralBase = `
 
       COALESCE(SUM(
         CASE
-          WHEN pr.marcador_local = r.goles_local
+          WHEN r.partido_id IS NOT NULL
+           AND pr.marcador_local = r.goles_local
            AND pr.marcador_visitante = r.goles_visitante
           THEN 1
           ELSE 0
@@ -33,7 +96,8 @@ const obtenerRankingGeneralBase = `
 
       COALESCE(SUM(
         CASE
-          WHEN pr.resultado =
+          WHEN r.partido_id IS NOT NULL
+           AND pr.resultado =
             CASE
               WHEN r.goles_local > r.goles_visitante THEN 'L'
               WHEN r.goles_visitante > r.goles_local THEN 'V'
@@ -64,20 +128,20 @@ const obtenerRankingGeneralBase = `
     SELECT
       u.id AS usuario_id,
       CASE
-        WHEN cr.equipo IS NOT NULL
-         AND LOWER(TRIM(cp.equipo)) = LOWER(TRIM(cr.equipo))
-        THEN cr.puntos
+        WHEN ca.equipo IS NOT NULL
+         AND LOWER(TRIM(cp.equipo)) = LOWER(TRIM(ca.equipo))
+        THEN ca.puntos
         ELSE 0
       END AS puntos_campeon,
       cp.equipo AS campeon_pronosticado,
-      cr.equipo AS campeon_real
+      ca.equipo AS campeon_real
 
     FROM usuarios u
 
     LEFT JOIN campeon_pronosticos cp
       ON cp.usuario_id = u.id
 
-    LEFT JOIN campeon_real cr
+    LEFT JOIN campeon_actual ca
       ON TRUE
   ),
 
@@ -85,9 +149,25 @@ const obtenerRankingGeneralBase = `
     SELECT
       pj.usuario_id AS id,
       pj.nombre,
-      pj.puntos_jornadas,
+
+      pj.puntos_pronostico,
+      pj.puntos_marcador,
+      pj.puntos_comodin,
       COALESCE(pc.puntos_campeon, 0) AS puntos_campeon,
-      pj.puntos_jornadas + COALESCE(pc.puntos_campeon, 0) AS total,
+
+      (
+        pj.puntos_pronostico
+        + pj.puntos_marcador
+        + pj.puntos_comodin
+      ) AS puntos_jornadas,
+
+      (
+        pj.puntos_pronostico
+        + pj.puntos_marcador
+        + pj.puntos_comodin
+        + COALESCE(pc.puntos_campeon, 0)
+      ) AS total,
+
       pj.pronosticos_realizados,
       pj.aciertos,
       pj.marcadores_exactos,
@@ -109,11 +189,17 @@ const obtenerRankingGeneralBase = `
         resultados_correctos DESC,
         nombre ASC
     ) AS posicion,
+
     id,
     nombre,
-    puntos_jornadas,
+
+    puntos_pronostico,
+    puntos_marcador,
+    puntos_comodin,
     puntos_campeon,
+    puntos_jornadas,
     total,
+
     pronosticos_realizados,
     aciertos,
     marcadores_exactos,
@@ -124,12 +210,6 @@ const obtenerRankingGeneralBase = `
   FROM ranking_base
 `;
 
-/*
-====================================
-HISTORIAL RANKING POR JORNADA
-Incluye usuarios con 0 puntos
-====================================
-*/
 const obtenerHistorialRanking = async (req, res) => {
   try {
     const resultado = await pool.query(`
@@ -173,12 +253,6 @@ const obtenerHistorialRanking = async (req, res) => {
   }
 };
 
-/*
-====================================
-RANKING GENERAL
-Incluye puntos por jornadas + campeón
-====================================
-*/
 const obtenerRankingGeneral = async (req, res) => {
   try {
     const resultado = await pool.query(`
@@ -201,12 +275,6 @@ const obtenerRankingGeneral = async (req, res) => {
   }
 };
 
-/*
-====================================
-MI RESUMEN DE RANKING
-Para dashboard del jugador
-====================================
-*/
 const obtenerMiResumenRanking = async (req, res) => {
   const usuarioId = req.usuario?.id;
 
@@ -243,19 +311,27 @@ const obtenerMiResumenRanking = async (req, res) => {
     return res.json({
       usuarioId: jugador.id,
       nombre: jugador.nombre,
+
       posicionGeneral: Number(jugador.posicion),
       totalJugadores: filas.length,
-      puntosJornadas: Number(jugador.puntos_jornadas),
+
+      puntosPronostico: Number(jugador.puntos_pronostico),
+      puntosMarcador: Number(jugador.puntos_marcador),
+      puntosComodin: Number(jugador.puntos_comodin),
       puntosCampeon: Number(jugador.puntos_campeon),
+      puntosJornadas: Number(jugador.puntos_jornadas),
       puntosTotales: Number(jugador.total),
+
       puntosLider: lider ? Number(lider.total) : Number(jugador.total),
       diferenciaLider: lider
         ? Number(lider.total) - Number(jugador.total)
         : 0,
+
       pronosticosRealizados: Number(jugador.pronosticos_realizados),
       aciertos: Number(jugador.aciertos),
       marcadoresExactos: Number(jugador.marcadores_exactos),
       resultadosCorrectos: Number(jugador.resultados_correctos),
+
       campeonPronosticado: jugador.campeon_pronosticado,
       campeonReal: jugador.campeon_real
     });
@@ -269,12 +345,6 @@ const obtenerMiResumenRanking = async (req, res) => {
   }
 };
 
-/*
-====================================
-RANKING POR JORNADA
-Incluye usuarios con 0 puntos
-====================================
-*/
 const obtenerRankingPorJornada = async (req, res) => {
   const jornada_id = Number(req.params.jornada);
 
