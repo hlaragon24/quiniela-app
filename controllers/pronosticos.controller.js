@@ -459,13 +459,15 @@ const obtenerHistoricoGeneralPronosticos = async (req, res) => {
         r.goles_visitante,
 
         CASE
+          WHEN r.partido_id IS NULL THEN NULL
           WHEN r.goles_local > r.goles_visitante THEN 'L'
           WHEN r.goles_visitante > r.goles_local THEN 'V'
           ELSE 'E'
         END AS resultado_real,
 
         CASE
-          WHEN pr.resultado =
+          WHEN r.partido_id IS NOT NULL
+           AND pr.resultado =
             CASE
               WHEN r.goles_local > r.goles_visitante THEN 'L'
               WHEN r.goles_visitante > r.goles_local THEN 'V'
@@ -476,13 +478,40 @@ const obtenerHistoricoGeneralPronosticos = async (req, res) => {
         END AS acerto_resultado,
 
         CASE
-          WHEN pr.marcador_local = r.goles_local
+          WHEN r.partido_id IS NOT NULL
+           AND pr.marcador_local = r.goles_local
            AND pr.marcador_visitante = r.goles_visitante
           THEN true
           ELSE false
         END AS acerto_marcador,
 
-        pr.puntos
+        CASE
+          WHEN r.partido_id IS NULL THEN 0
+          ELSE
+            (
+              CASE
+                WHEN pr.resultado =
+                  CASE
+                    WHEN r.goles_local > r.goles_visitante THEN 'L'
+                    WHEN r.goles_visitante > r.goles_local THEN 'V'
+                    ELSE 'E'
+                  END
+                THEN
+                  CASE WHEN p.es_comodin = true THEN 2 ELSE 1 END
+                ELSE 0
+              END
+            )
+            +
+            (
+              CASE
+                WHEN pr.marcador_local = r.goles_local
+                 AND pr.marcador_visitante = r.goles_visitante
+                THEN
+                  CASE WHEN p.es_comodin = true THEN 3 ELSE 2 END
+                ELSE 0
+              END
+            )
+        END AS puntos_calculados
 
       FROM pronosticos pr
 
@@ -507,10 +536,7 @@ const obtenerHistoricoGeneralPronosticos = async (req, res) => {
     return res.json(resultado.rows);
 
   } catch (error) {
-    console.error(
-      "Error obteniendo histórico general:",
-      error
-    );
+    console.error("Error obteniendo histórico general:", error);
 
     return res.status(500).json({
       mensaje: "Error obteniendo histórico general"
