@@ -5,13 +5,11 @@ const controller = require("../controllers/pronosticos.controller");
 
 const authMiddleware = require("../middleware/auth.middleware");
 
-
 router.post(
   "/guardar-jornada",
   authMiddleware,
   controller.guardarPronosticosJornada
 );
-
 
 router.get(
   "/usuario",
@@ -23,6 +21,12 @@ router.get(
   "/usuario/:jornadaId",
   authMiddleware,
   controller.obtenerPronosticosUsuarioPorJornada
+);
+
+router.get(
+  "/historico-general",
+  authMiddleware,
+  controller.obtenerHistoricoGeneralPronosticos
 );
 
 module.exports = router;

@@ -436,9 +436,92 @@ const obtenerPronosticosUsuarioPorJornada = async (req, res) => {
   }
 };
 
+const obtenerHistoricoGeneralPronosticos = async (req, res) => {
+  try {
+    const resultado = await pool.query(`
+      SELECT
+        j.id AS jornada_id,
+        j.numero AS jornada_numero,
+
+        u.id AS usuario_id,
+        u.nombre AS jugador,
+
+        p.id AS partido_id,
+        p.local,
+        p.visitante,
+        p.es_comodin,
+
+        pr.resultado AS pronostico_resultado,
+        pr.marcador_local AS pronostico_local,
+        pr.marcador_visitante AS pronostico_visitante,
+
+        r.goles_local,
+        r.goles_visitante,
+
+        CASE
+          WHEN r.goles_local > r.goles_visitante THEN 'L'
+          WHEN r.goles_visitante > r.goles_local THEN 'V'
+          ELSE 'E'
+        END AS resultado_real,
+
+        CASE
+          WHEN pr.resultado =
+            CASE
+              WHEN r.goles_local > r.goles_visitante THEN 'L'
+              WHEN r.goles_visitante > r.goles_local THEN 'V'
+              ELSE 'E'
+            END
+          THEN true
+          ELSE false
+        END AS acerto_resultado,
+
+        CASE
+          WHEN pr.marcador_local = r.goles_local
+           AND pr.marcador_visitante = r.goles_visitante
+          THEN true
+          ELSE false
+        END AS acerto_marcador,
+
+        pr.puntos
+
+      FROM pronosticos pr
+
+      INNER JOIN usuarios u
+        ON u.id = pr.usuario_id
+
+      INNER JOIN partidos p
+        ON p.id = pr.partido_id
+
+      INNER JOIN jornadas j
+        ON j.id = p.jornada_id
+
+      LEFT JOIN resultados r
+        ON r.partido_id = p.id
+
+      ORDER BY
+        j.numero DESC,
+        u.nombre ASC,
+        p.id ASC
+    `);
+
+    return res.json(resultado.rows);
+
+  } catch (error) {
+    console.error(
+      "Error obteniendo histórico general:",
+      error
+    );
+
+    return res.status(500).json({
+      mensaje: "Error obteniendo histórico general"
+    });
+  }
+};
+
 module.exports = {
   guardarPronostico,
   obtenerPronosticosUsuario,
   guardarPronosticosJornada,
-  obtenerPronosticosUsuarioPorJornada
+  obtenerPronosticosUsuarioPorJornada,
+  obtenerHistoricoGeneralPronosticos
 };
