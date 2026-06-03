@@ -212,7 +212,7 @@ const crearUsuario = async (req, res) => {
 
 module.exports = {
   obtenerUsuarios,
-  createarUsuario,
+  crearUsuario,
   actualizarRolUsuario,
   actualizarEstadoUsuario,
   resetearPasswordUsuario
