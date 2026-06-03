@@ -3,22 +3,27 @@ const express = require("express");
 const router = express.Router();
 
 const controller = require("../controllers/ranking.controller");
-
+const verificarToken = require("../middleware/auth.middleware");
 
 router.get(
-    "/",
-    controller.obtenerRankingGeneral
+  "/",
+  controller.obtenerRankingGeneral
 );
 
 router.get(
-    "/jornada/:jornada",
-    controller.obtenerRankingPorJornada
+  "/mi-resumen",
+  verificarToken,
+  controller.obtenerMiResumenRanking
 );
 
 router.get(
-    "/historial",
-    controller.obtenerHistorialRanking
+  "/jornada/:jornada",
+  controller.obtenerRankingPorJornada
 );
 
+router.get(
+  "/historial",
+  controller.obtenerHistorialRanking
+);
 
 module.exports = router;

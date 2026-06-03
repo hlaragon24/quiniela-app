@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -7,11 +6,14 @@ const cors = require("cors");
 const app = express();
 
 console.log("🔥 SERVER VERSION NUEVA 🔥");
-console.log("🌐 DATABASE_URL:", process.env.DATABASE_URL);
+console.log("🌐 DATABASE_URL cargada:", !!process.env.DATABASE_URL);
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "*",
+  credentials: true
+}));
+
 app.use(express.json());
-
 
 // Importar rutas
 const partidosRoutes = require("./routes/partidos.routes");
@@ -25,7 +27,6 @@ const adminRoutes = require("./routes/admin.routes");
 const historicoRoutes = require("./routes/historico.routes");
 const usuariosRoutes = require("./routes/usuarios.routes");
 
-
 // Registrar rutas
 app.use("/partidos", partidosRoutes);
 app.use("/pronosticos", pronosticosRoutes);
@@ -35,20 +36,24 @@ app.use("/auth", authRoutes);
 app.use("/campeon", campeonRoutes);
 app.use("/jornadas", jornadasRoutes);
 app.use("/admin", adminRoutes);
-app.use("/historico", historicoRoutes); 
+app.use("/historico", historicoRoutes);
 app.use("/usuarios", usuariosRoutes);
-
-//
 
 // Ruta base
 app.get("/", (req, res) => {
-    res.send("Servidor funcionando 🚀 Quiniela App activa");
+  res.send("Servidor funcionando 🚀 Quiniela App activa");
+});
+
+// Ruta no encontrada
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Ruta no encontrada"
+  });
 });
 
 
 const PORT = process.env.PORT || 3000;
 
-
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });

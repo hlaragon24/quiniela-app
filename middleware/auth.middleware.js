@@ -3,48 +3,37 @@ const jwt = require("jsonwebtoken");
 const { SECRET } = require("../config/jwt");
 
 const verificarToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
 
-    const authHeader = req.headers["authorization"]
+  if (!authHeader) {
+    return res.status(401).json({
+      mensaje: "Token requerido"
+    });
+  }
 
-    if (!authHeader) {
+  const partes = authHeader.split(" ");
 
-        return res.status(401).json({
-            mensaje: "Token requerido"
-        });
+  if (partes.length !== 2 || partes[0] !== "Bearer") {
+    return res.status(401).json({
+      mensaje: "Formato de token inválido"
+    });
+  }
 
-    }
+  const token = partes[1];
 
-    // formato esperado:
-    // Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+  try {
+    const decoded = jwt.verify(token, SECRET);
 
-    const token = authHeader.split(" ")[1];
+    req.usuario = decoded;
 
-    if (!token) {
+    next();
+  } catch (error) {
+    console.error("Error verificando token:", error.message);
 
-        return res.status(401).json({
-            mensaje: "Token inválido"
-        });
-
-    }
-
-    try {
-
-        const decoded = jwt.verify(token, SECRET);
-
-        req.usuario = decoded;
-
-        next();
-
-    } catch (error) {
-
-        console.error("Error verificando token:", error.message);
-
-        return res.status(401).json({
-            mensaje: "Token inválido"
-        });
-
-    }
-
+    return res.status(401).json({
+      mensaje: "Token inválido o expirado"
+    });
+  }
 };
 
 module.exports = verificarToken;

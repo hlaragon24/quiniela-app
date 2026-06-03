@@ -1,6 +1,17 @@
 const bcrypt = require("bcryptjs");
 const pool = require("../config/database");
 
+const rolesValidos = ["admin", "jugador"];
+
+const validarId = (id) => {
+  return !isNaN(id) && Number.isInteger(id) && id > 0;
+};
+
+const validarEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
 const obtenerUsuarios = async (req, res) => {
   try {
     const resultado = await pool.query(`
@@ -16,11 +27,11 @@ const obtenerUsuarios = async (req, res) => {
       ORDER BY id ASC
     `);
 
-    res.json(resultado.rows);
+    return res.json(resultado.rows);
   } catch (error) {
     console.error("Error obteniendo usuarios:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       mensaje: "Error obteniendo usuarios"
     });
   }
@@ -30,11 +41,21 @@ const actualizarRolUsuario = async (req, res) => {
   const id = Number(req.params.id);
   const { rol } = req.body;
 
-  const rolesValidos = ["admin", "jugador"];
+  if (!validarId(id)) {
+    return res.status(400).json({
+      mensaje: "ID inválido"
+    });
+  }
 
   if (!rolesValidos.includes(rol)) {
     return res.status(400).json({
       mensaje: "Rol inválido"
+    });
+  }
+
+  if (req.usuario.id === id && rol !== "admin") {
+    return res.status(400).json({
+      mensaje: "No puedes quitarte el rol de administrador"
     });
   }
 
@@ -55,14 +76,14 @@ const actualizarRolUsuario = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       mensaje: "Rol actualizado correctamente",
       usuario: resultado.rows[0]
     });
   } catch (error) {
     console.error("Error actualizando rol:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       mensaje: "Error actualizando rol"
     });
   }
@@ -72,9 +93,21 @@ const actualizarEstadoUsuario = async (req, res) => {
   const id = Number(req.params.id);
   const { activo } = req.body;
 
+  if (!validarId(id)) {
+    return res.status(400).json({
+      mensaje: "ID inválido"
+    });
+  }
+
   if (typeof activo !== "boolean") {
     return res.status(400).json({
       mensaje: "Estado inválido"
+    });
+  }
+
+  if (req.usuario.id === id && activo === false) {
+    return res.status(400).json({
+      mensaje: "No puedes desactivar tu propio usuario"
     });
   }
 
@@ -95,14 +128,14 @@ const actualizarEstadoUsuario = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       mensaje: activo ? "Usuario activado" : "Usuario desactivado",
       usuario: resultado.rows[0]
     });
   } catch (error) {
     console.error("Error actualizando estado:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       mensaje: "Error actualizando estado"
     });
   }
@@ -111,6 +144,12 @@ const actualizarEstadoUsuario = async (req, res) => {
 const resetearPasswordUsuario = async (req, res) => {
   const id = Number(req.params.id);
   const { password } = req.body;
+
+  if (!validarId(id)) {
+    return res.status(400).json({
+      mensaje: "ID inválido"
+    });
+  }
 
   if (!password || password.length < 6) {
     return res.status(400).json({
@@ -137,13 +176,13 @@ const resetearPasswordUsuario = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       mensaje: "Contraseña actualizada correctamente"
     });
   } catch (error) {
     console.error("Error reseteando contraseña:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       mensaje: "Error reseteando contraseña"
     });
   }
@@ -152,11 +191,17 @@ const resetearPasswordUsuario = async (req, res) => {
 const crearUsuario = async (req, res) => {
   const { nombre, email, password, rol } = req.body;
 
-  const rolesValidos = ["admin", "jugador"];
-
   if (!nombre || !email || !password || !rol) {
     return res.status(400).json({
       mensaje: "Todos los campos son obligatorios"
+    });
+  }
+
+  const emailNormalizado = email.trim().toLowerCase();
+
+  if (!validarEmail(emailNormalizado)) {
+    return res.status(400).json({
+      mensaje: "Email inválido"
     });
   }
 
@@ -175,7 +220,7 @@ const crearUsuario = async (req, res) => {
   try {
     const existe = await pool.query(
       "SELECT id FROM usuarios WHERE email = $1",
-      [email]
+      [emailNormalizado]
     );
 
     if (existe.rows.length > 0) {
@@ -194,17 +239,17 @@ const crearUsuario = async (req, res) => {
         ($1, $2, $3, $4, true)
       RETURNING id, nombre, email, rol, activo
       `,
-      [nombre, email, passwordHash, rol]
+      [nombre.trim(), emailNormalizado, passwordHash, rol]
     );
 
-    res.json({
+    return res.status(201).json({
       mensaje: "Usuario creado correctamente",
       usuario: resultado.rows[0]
     });
   } catch (error) {
     console.error("Error creando usuario:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       mensaje: "Error creando usuario"
     });
   }

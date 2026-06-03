@@ -1,7 +1,21 @@
 const db = require("../config/database");
 
-console.log("🔥 CONTROLLER PARTIDOS CARGADO");
+const validarId = (id) => {
+  return !isNaN(id) && Number.isInteger(id) && id > 0;
+};
 
+const validarDatosPartido = (partido) => {
+  if (
+    !partido.jornada_id ||
+    !partido.local ||
+    !partido.visitante ||
+    !partido.fecha
+  ) {
+    return false;
+  }
+
+  return true;
+};
 
 /*
 ====================================
@@ -9,36 +23,35 @@ OBTENER PARTIDOS POR JORNADA
 ====================================
 */
 const obtenerPartidosPorJornada = async (req, res) => {
+  const jornadaId = Number(req.params.jornadaId);
 
-    try {
+  if (!validarId(jornadaId)) {
+    return res.status(400).json({
+      mensaje: "ID de jornada inválido"
+    });
+  }
 
-        const { jornadaId } = req.params;
+  try {
+    const resultado = await db.query(
+      `
+      SELECT 
+        p.*
+      FROM partidos p
+      WHERE p.jornada_id = $1
+      ORDER BY p.id
+      `,
+      [jornadaId]
+    );
 
-        const resultado = await db.query(
-            `
-            SELECT 
-                p.*
-            FROM partidos p
-            WHERE p.jornada_id = $1
-            ORDER BY p.id
-            `,
-            [jornadaId]
-        );
+    return res.json(resultado.rows);
+  } catch (error) {
+    console.error("Error obtenerPartidosPorJornada:", error);
 
-        res.json(resultado.rows);
-
-    } catch (error) {
-
-        console.error("Error obtenerPartidosPorJornada:", error);
-
-        res.status(500).json({
-            mensaje: "Error al obtener partidos"
-        });
-
-    }
-
+    return res.status(500).json({
+      mensaje: "Error al obtener partidos"
+    });
+  }
 };
-
 
 /*
 ====================================
@@ -46,41 +59,56 @@ CREAR PARTIDO
 ====================================
 */
 const crearPartido = async (req, res) => {
+  const {
+    jornada_id,
+    local,
+    visitante,
+    fecha,
+    es_comodin = false
+  } = req.body;
 
-    try {
+  if (!validarDatosPartido(req.body)) {
+    return res.status(400).json({
+      mensaje: "Todos los campos obligatorios del partido son requeridos"
+    });
+  }
 
-        const {
-            jornada_id,
-            local,
-            visitante,
-            fecha,
-            es_comodin
-        } = req.body;
+  if (!validarId(Number(jornada_id))) {
+    return res.status(400).json({
+      mensaje: "ID de jornada inválido"
+    });
+  }
 
-        const resultado = await db.query(
-            `
-            INSERT INTO partidos
-            (jornada_id, local, visitante, fecha, es_comodin)
-            VALUES ($1,$2,$3,$4,$5)
-            RETURNING *
-            `,
-            [jornada_id, local, visitante, fecha, es_comodin]
-        );
+  try {
+    const resultado = await db.query(
+      `
+      INSERT INTO partidos
+        (jornada_id, local, visitante, fecha, es_comodin)
+      VALUES
+        ($1, $2, $3, $4, $5)
+      RETURNING *
+      `,
+      [
+        Number(jornada_id),
+        local.trim(),
+        visitante.trim(),
+        fecha,
+        Boolean(es_comodin)
+      ]
+    );
 
-        res.json(resultado.rows[0]);
+    return res.status(201).json({
+      mensaje: "Partido creado correctamente",
+      partido: resultado.rows[0]
+    });
+  } catch (error) {
+    console.error("Error crearPartido:", error);
 
-    } catch (error) {
-
-        console.error("Error crearPartido:", error);
-
-        res.status(500).json({
-            mensaje: "Error al crear partido"
-        });
-
-    }
-
+    return res.status(500).json({
+      mensaje: "Error al crear partido"
+    });
+  }
 };
-
 
 /*
 ====================================
@@ -88,46 +116,69 @@ CREAR PARTIDOS EN LOTE
 ====================================
 */
 const crearPartidosLote = async (req, res) => {
+  const partidos = req.body;
 
-    try {
+  if (!Array.isArray(partidos) || partidos.length === 0) {
+    return res.status(400).json({
+      mensaje: "Debes enviar una lista de partidos"
+    });
+  }
 
-        const partidos = req.body;
-
-        for (let partido of partidos) {
-
-            await db.query(
-                `
-                INSERT INTO partidos
-                (jornada_id, local, visitante, fecha, es_comodin)
-                VALUES ($1,$2,$3,$4,$5)
-                `,
-                [
-                    partido.jornada_id,
-                    partido.local,
-                    partido.visitante,
-                    partido.fecha,
-                    partido.es_comodin
-                ]
-            );
-
-        }
-
-        res.json({
-            mensaje: "Partidos creados correctamente"
-        });
-
-    } catch (error) {
-
-        console.error("Error crearPartidosLote:", error);
-
-        res.status(500).json({
-            mensaje: "Error al crear partidos en lote"
-        });
-
+  for (const partido of partidos) {
+    if (!validarDatosPartido(partido)) {
+      return res.status(400).json({
+        mensaje: "Todos los partidos deben tener jornada_id, local, visitante y fecha"
+      });
     }
 
-};
+    if (!validarId(Number(partido.jornada_id))) {
+      return res.status(400).json({
+        mensaje: "Uno o más partidos tienen ID de jornada inválido"
+      });
+    }
+  }
 
+  const client = await db.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    for (const partido of partidos) {
+      await client.query(
+        `
+        INSERT INTO partidos
+          (jornada_id, local, visitante, fecha, es_comodin)
+        VALUES
+          ($1, $2, $3, $4, $5)
+        `,
+        [
+          Number(partido.jornada_id),
+          partido.local.trim(),
+          partido.visitante.trim(),
+          partido.fecha,
+          Boolean(partido.es_comodin)
+        ]
+      );
+    }
+
+    await client.query("COMMIT");
+
+    return res.status(201).json({
+      mensaje: "Partidos creados correctamente",
+      total: partidos.length
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error("Error crearPartidosLote:", error);
+
+    return res.status(500).json({
+      mensaje: "Error al crear partidos en lote"
+    });
+  } finally {
+    client.release();
+  }
+};
 
 /*
 ====================================
@@ -135,55 +186,75 @@ EDITAR PARTIDO
 ====================================
 */
 const editarPartido = async (req, res) => {
+  const id = Number(req.params.id);
 
-    try {
+  const {
+    jornada_id,
+    local,
+    visitante,
+    fecha,
+    es_comodin = false
+  } = req.body;
 
-        const { id } = req.params;
+  if (!validarId(id)) {
+    return res.status(400).json({
+      mensaje: "ID de partido inválido"
+    });
+  }
 
-        const {
-            jornada_id,
-            local,
-            visitante,
-            fecha,
-            es_comodin
-        } = req.body;
+  if (!validarDatosPartido(req.body)) {
+    return res.status(400).json({
+      mensaje: "Todos los campos obligatorios del partido son requeridos"
+    });
+  }
 
-        const resultado = await db.query(
-            `
-            UPDATE partidos
-            SET
-                jornada_id = $1,
-                local = $2,
-                visitante = $3,
-                fecha = $4,
-                es_comodin = $5
-            WHERE id = $6
-            RETURNING *
-            `,
-            [
-                jornada_id,
-                local,
-                visitante,
-                fecha,
-                es_comodin,
-                id
-            ]
-        );
+  if (!validarId(Number(jornada_id))) {
+    return res.status(400).json({
+      mensaje: "ID de jornada inválido"
+    });
+  }
 
-        res.json(resultado.rows[0]);
+  try {
+    const resultado = await db.query(
+      `
+      UPDATE partidos
+      SET
+        jornada_id = $1,
+        local = $2,
+        visitante = $3,
+        fecha = $4,
+        es_comodin = $5
+      WHERE id = $6
+      RETURNING *
+      `,
+      [
+        Number(jornada_id),
+        local.trim(),
+        visitante.trim(),
+        fecha,
+        Boolean(es_comodin),
+        id
+      ]
+    );
 
-    } catch (error) {
-
-        console.error("Error editarPartido:", error);
-
-        res.status(500).json({
-            mensaje: "Error editando partido"
-        });
-
+    if (resultado.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Partido no encontrado"
+      });
     }
 
-};
+    return res.json({
+      mensaje: "Partido actualizado correctamente",
+      partido: resultado.rows[0]
+    });
+  } catch (error) {
+    console.error("Error editarPartido:", error);
 
+    return res.status(500).json({
+      mensaje: "Error editando partido"
+    });
+  }
+};
 
 /*
 ====================================
@@ -191,73 +262,72 @@ ELIMINAR PARTIDO
 ====================================
 */
 const eliminarPartido = async (req, res) => {
+  const id = Number(req.params.id);
 
-    try {
+  if (!validarId(id)) {
+    return res.status(400).json({
+      mensaje: "ID de partido inválido"
+    });
+  }
 
-        const { id } = req.params;
+  try {
+    const resultado = await db.query(
+      `
+      DELETE FROM partidos
+      WHERE id = $1
+      RETURNING id
+      `,
+      [id]
+    );
 
-        await db.query(
-            `
-            DELETE FROM partidos
-            WHERE id = $1
-            `,
-            [id]
-        );
-
-        res.json({
-            mensaje: "Partido eliminado correctamente"
-        });
-
-    } catch (error) {
-
-        console.error("Error eliminarPartido:", error);
-
-        res.status(500).json({
-            mensaje: "Error eliminando partido"
-        });
-
+    if (resultado.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Partido no encontrado"
+      });
     }
 
-};
+    return res.json({
+      mensaje: "Partido eliminado correctamente"
+    });
+  } catch (error) {
+    console.error("Error eliminarPartido:", error);
 
+    return res.status(500).json({
+      mensaje: "Error eliminando partido"
+    });
+  }
+};
 
 /*
 ====================================
-OBTENER TODOS LOS PARTIDOS (ADMIN)
+OBTENER TODOS LOS PARTIDOS ADMIN
 ====================================
 */
 const obtenerTodosPartidos = async (req, res) => {
+  try {
+    const resultado = await db.query(
+      `
+      SELECT *
+      FROM partidos
+      ORDER BY jornada_id, id
+      `
+    );
 
-    try {
+    return res.json(resultado.rows);
+  } catch (error) {
+    console.error("Error obtenerTodosPartidos:", error);
 
-        const resultado = await db.query(
-            `
-            SELECT *
-            FROM partidos
-            ORDER BY jornada_id, id
-            `
-        );
-
-        res.json(resultado.rows);
-
-    } catch (error) {
-
-        console.error("Error obtenerTodosPartidos:", error);
-
-        res.status(500).json({
-            mensaje: "Error obteniendo partidos"
-        });
-
-    }
-
+    return res.status(500).json({
+      mensaje: "Error obteniendo partidos"
+    });
+  }
 };
 
-
 module.exports = {
-    obtenerTodosPartidos,
-    obtenerPartidosPorJornada,
-    crearPartido,
-    crearPartidosLote,
-    editarPartido,
-    eliminarPartido
+  obtenerTodosPartidos,
+  obtenerPartidosPorJornada,
+  crearPartido,
+  crearPartidosLote,
+  editarPartido,
+  eliminarPartido
 };
