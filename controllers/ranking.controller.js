@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { resolverTorneoId } = require("../utils/torneo");
 
 /*
 ====================================
@@ -10,6 +11,8 @@ Reglas:
 - Comodín agrega +1 al pronóstico correcto
 - Comodín agrega +1 al marcador exacto
 - Campeón suma puntos aparte
+
+$1 = torneo_id
 ====================================
 */
 const obtenerRankingGeneralBase = `
@@ -18,6 +21,7 @@ const obtenerRankingGeneralBase = `
       equipo,
       puntos
     FROM campeon_real
+    WHERE torneo_id = $1
     ORDER BY id DESC
     LIMIT 1
   ),
@@ -116,6 +120,10 @@ const obtenerRankingGeneralBase = `
     LEFT JOIN partidos p
       ON pr.partido_id = p.id
 
+    LEFT JOIN jornadas j
+      ON p.jornada_id = j.id
+     AND j.torneo_id = $1
+
     LEFT JOIN resultados r
       ON p.id = r.partido_id
 
@@ -140,6 +148,7 @@ const obtenerRankingGeneralBase = `
 
     LEFT JOIN campeon_pronosticos cp
       ON cp.usuario_id = u.id
+     AND cp.torneo_id = $1
 
     LEFT JOIN campeon_actual ca
       ON TRUE
@@ -212,6 +221,8 @@ const obtenerRankingGeneralBase = `
 
 const obtenerHistorialRanking = async (req, res) => {
   try {
+    const torneoId = await resolverTorneoId(req.query.torneo_id);
+
     const resultado = await pool.query(`
       SELECT
         u.id,
@@ -230,6 +241,8 @@ const obtenerHistorialRanking = async (req, res) => {
         ON pr.usuario_id = u.id
        AND pr.partido_id = p.id
 
+      WHERE j.torneo_id = $1
+
       GROUP BY
         u.id,
         u.nombre,
@@ -240,21 +253,25 @@ const obtenerHistorialRanking = async (req, res) => {
         j.numero ASC,
         puntos DESC,
         u.nombre ASC
-    `);
+    `, [torneoId]);
 
     return res.json(resultado.rows);
 
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.mensaje });
+    }
     console.error("Error obteniendo historial ranking:", error);
-
-    return res.status(500).json({
-      mensaje: "Error obteniendo historial ranking"
-    });
+    return res.status(500).json({ mensaje: "Error obteniendo historial ranking" });
   }
 };
 
 const obtenerRankingGeneral = async (req, res) => {
   try {
+    const torneoId = await resolverTorneoId(
+      req.params.torneoId ?? req.query.torneo_id
+    );
+
     const resultado = await pool.query(`
       ${obtenerRankingGeneralBase}
       ORDER BY
@@ -262,16 +279,16 @@ const obtenerRankingGeneral = async (req, res) => {
         marcadores_exactos DESC,
         resultados_correctos DESC,
         nombre ASC
-    `);
+    `, [torneoId]);
 
     return res.json(resultado.rows);
 
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.mensaje });
+    }
     console.error("Error obteniendo ranking general:", error);
-
-    return res.status(500).json({
-      mensaje: "Error obteniendo ranking general"
-    });
+    return res.status(500).json({ mensaje: "Error obteniendo ranking general" });
   }
 };
 
@@ -279,41 +296,50 @@ const obtenerMiResumenRanking = async (req, res) => {
   const usuarioId = req.usuario?.id;
 
   if (!usuarioId) {
-    return res.status(401).json({
-      mensaje: "Usuario no autenticado"
-    });
+    return res.status(401).json({ mensaje: "Usuario no autenticado" });
   }
 
   try {
-    const ranking = await pool.query(`
-      ${obtenerRankingGeneralBase}
-      ORDER BY
-        total DESC,
-        marcadores_exactos DESC,
-        resultados_correctos DESC,
-        nombre ASC
-    `);
+    const torneoId = await resolverTorneoId(req.query.torneo_id);
 
-    const filas = ranking.rows;
+    // $1 = torneoId (usado dentro de la CTE base), $2 = usuarioId (filtro externo)
+    const resultado = await pool.query(`
+      WITH ranking_completo AS (
+        ${obtenerRankingGeneralBase}
+        ORDER BY
+          total DESC,
+          marcadores_exactos DESC,
+          resultados_correctos DESC,
+          nombre ASC
+      ),
+      total_jugadores AS (
+        SELECT COUNT(*) AS total FROM ranking_completo
+      ),
+      lider AS (
+        SELECT total AS puntos_lider FROM ranking_completo LIMIT 1
+      )
+      SELECT
+        rc.*,
+        tj.total AS total_jugadores,
+        l.puntos_lider
+      FROM ranking_completo rc
+      CROSS JOIN total_jugadores tj
+      CROSS JOIN lider l
+      WHERE rc.id = $2
+    `, [torneoId, usuarioId]);
 
-    const jugador = filas.find(
-      fila => Number(fila.id) === Number(usuarioId)
-    );
-
-    if (!jugador) {
-      return res.status(404).json({
-        mensaje: "Usuario no encontrado en ranking"
-      });
+    if (resultado.rows.length === 0) {
+      return res.status(404).json({ mensaje: "Usuario no encontrado en ranking" });
     }
 
-    const lider = filas[0] || null;
+    const jugador = resultado.rows[0];
 
     return res.json({
       usuarioId: jugador.id,
       nombre: jugador.nombre,
 
       posicionGeneral: Number(jugador.posicion),
-      totalJugadores: filas.length,
+      totalJugadores: Number(jugador.total_jugadores),
 
       puntosPronostico: Number(jugador.puntos_pronostico),
       puntosMarcador: Number(jugador.puntos_marcador),
@@ -322,10 +348,8 @@ const obtenerMiResumenRanking = async (req, res) => {
       puntosJornadas: Number(jugador.puntos_jornadas),
       puntosTotales: Number(jugador.total),
 
-      puntosLider: lider ? Number(lider.total) : Number(jugador.total),
-      diferenciaLider: lider
-        ? Number(lider.total) - Number(jugador.total)
-        : 0,
+      puntosLider: Number(jugador.puntos_lider),
+      diferenciaLider: Number(jugador.puntos_lider) - Number(jugador.total),
 
       pronosticosRealizados: Number(jugador.pronosticos_realizados),
       aciertos: Number(jugador.aciertos),
@@ -337,11 +361,11 @@ const obtenerMiResumenRanking = async (req, res) => {
     });
 
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.mensaje });
+    }
     console.error("Error obteniendo mi resumen de ranking:", error);
-
-    return res.status(500).json({
-      mensaje: "Error obteniendo mi resumen de ranking"
-    });
+    return res.status(500).json({ mensaje: "Error obteniendo mi resumen de ranking" });
   }
 };
 
@@ -349,25 +373,17 @@ const obtenerRankingPorJornada = async (req, res) => {
   const jornada_id = Number(req.params.jornada);
 
   if (!Number.isInteger(jornada_id) || jornada_id <= 0) {
-    return res.status(400).json({
-      mensaje: "ID de jornada inválido"
-    });
+    return res.status(400).json({ mensaje: "ID de jornada inválido" });
   }
 
   try {
     const jornadaExiste = await pool.query(
-      `
-      SELECT id, numero, estado
-      FROM jornadas
-      WHERE id = $1
-      `,
+      `SELECT id, numero, estado FROM jornadas WHERE id = $1`,
       [jornada_id]
     );
 
     if (jornadaExiste.rows.length === 0) {
-      return res.status(404).json({
-        mensaje: "Jornada no encontrada"
-      });
+      return res.status(404).json({ mensaje: "Jornada no encontrada" });
     }
 
     const resultado = await pool.query(`
@@ -406,10 +422,7 @@ const obtenerRankingPorJornada = async (req, res) => {
         COUNT(pr.id) AS pronosticos_realizados,
 
         COALESCE(SUM(
-          CASE
-            WHEN pr.puntos > 0 THEN 1
-            ELSE 0
-          END
+          CASE WHEN pr.puntos > 0 THEN 1 ELSE 0 END
         ), 0) AS aciertos,
 
         COALESCE(SUM(
@@ -446,9 +459,7 @@ const obtenerRankingPorJornada = async (req, res) => {
       LEFT JOIN resultados r
         ON p.id = r.partido_id
 
-      GROUP BY
-        u.id,
-        u.nombre
+      GROUP BY u.id, u.nombre
 
       ORDER BY
         total DESC,
@@ -464,10 +475,56 @@ const obtenerRankingPorJornada = async (req, res) => {
 
   } catch (error) {
     console.error("Error obteniendo ranking por jornada:", error);
+    return res.status(500).json({ mensaje: "Error obteniendo ranking por jornada" });
+  }
+};
 
-    return res.status(500).json({
-      mensaje: "Error obteniendo ranking por jornada"
-    });
+/*
+====================================
+GANADORES POR JORNADA DENTRO DE UN TORNEO
+====================================
+Retorna una fila por jornada con el usuario que más puntos obtuvo.
+*/
+const obtenerGanadoresPorTorneo = async (req, res) => {
+  try {
+    const torneoId = await resolverTorneoId(req.params.torneoId ?? req.query.torneo_id);
+
+    const resultado = await pool.query(`
+      SELECT
+        j.id AS jornada_id,
+        j.numero AS jornada_numero,
+        j.estado,
+        w.usuario_id,
+        w.nombre,
+        w.total AS puntos
+      FROM jornadas j
+      LEFT JOIN LATERAL (
+        SELECT
+          u.id AS usuario_id,
+          u.nombre,
+          COALESCE(SUM(pr.puntos), 0) AS total
+        FROM usuarios u
+        LEFT JOIN pronosticos pr
+          ON pr.usuario_id = u.id
+        LEFT JOIN partidos p
+          ON pr.partido_id = p.id
+         AND p.jornada_id = j.id
+        GROUP BY u.id, u.nombre
+        ORDER BY total DESC, u.nombre ASC
+        LIMIT 1
+      ) w ON TRUE
+      WHERE j.torneo_id = $1
+      ORDER BY j.numero ASC
+    `, [torneoId]);
+
+    return res.json(resultado.rows);
+
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.mensaje });
+    }
+    console.error("Error obteniendo ganadores por torneo:", error);
+    return res.status(500).json({ mensaje: "Error obteniendo ganadores por torneo" });
   }
 };
 
@@ -475,5 +532,6 @@ module.exports = {
   obtenerRankingGeneral,
   obtenerRankingPorJornada,
   obtenerHistorialRanking,
-  obtenerMiResumenRanking
+  obtenerMiResumenRanking,
+  obtenerGanadoresPorTorneo
 };

@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { resolverTorneoId } = require("../utils/torneo");
 
 
 const obtenerJornadaPorNumero = async (req, res) => {
@@ -45,25 +46,36 @@ const crearJornada = async (req, res) => {
         const {
             numero,
             fecha_inicio,
-            fecha_cierre
+            fecha_cierre,
+            torneo_id
         } = req.body;
 
-        if (!numero || !fecha_inicio || !fecha_cierre) {
+        if (!numero || !fecha_inicio || !fecha_cierre || !torneo_id) {
 
             return res.status(400).json({
-                mensaje: "Datos incompletos"
+                mensaje: "Datos incompletos. Se requiere: numero, fecha_inicio, fecha_cierre, torneo_id"
             });
 
+        }
+
+        const torneoIdNum = Number(torneo_id);
+        if (!Number.isInteger(torneoIdNum) || torneoIdNum <= 0) {
+            return res.status(400).json({ mensaje: "torneo_id inválido" });
+        }
+
+        const torneoExiste = await pool.query(`SELECT id FROM torneos WHERE id = $1`, [torneoIdNum]);
+        if (torneoExiste.rows.length === 0) {
+            return res.status(404).json({ mensaje: "Torneo no encontrado" });
         }
 
         const jornada = await pool.query(
             `
             INSERT INTO jornadas
-            (numero, fecha_inicio, fecha_cierre)
-            VALUES ($1,$2,$3)
+            (numero, fecha_inicio, fecha_cierre, torneo_id)
+            VALUES ($1,$2,$3,$4)
             RETURNING *
             `,
-            [numero, fecha_inicio, fecha_cierre]
+            [numero, fecha_inicio, fecha_cierre, torneoIdNum]
         );
 
         res.json({
@@ -88,24 +100,30 @@ const obtenerJornadas = async (req, res) => {
 
     try {
 
-        const result = await pool.query(`
-      SELECT
-        numero,
-        fecha_inicio,
-        fecha_cierre,
-        CASE
-          WHEN NOW() > fecha_cierre THEN 'cerrada'
-          ELSE 'abierta'
-        END AS estado
-      FROM jornadas
-      ORDER BY numero
-    `);
+        const torneoIdParam = req.query.torneo_id;
+        let torneoId = null;
+
+        if (torneoIdParam !== undefined) {
+            torneoId = await resolverTorneoId(torneoIdParam);
+        }
+
+        const result = await pool.query(
+            `SELECT id, numero, fecha_inicio, fecha_cierre, estado, torneo_id
+             FROM jornadas
+             WHERE ($1::int IS NULL OR torneo_id = $1)
+             ORDER BY numero`,
+            [torneoId]
+        );
 
         res.json(result.rows);
 
     }
 
     catch (error) {
+
+        if (error.status) {
+            return res.status(error.status).json({ mensaje: error.mensaje });
+        }
 
         console.error(error);
 
@@ -203,9 +221,33 @@ const actualizarJornada = async (req, res) => {
 
     try {
 
-        const { numero } = req.params;
+        const numero = Number(req.params.numero);
+
+        if (!Number.isInteger(numero) || numero <= 0) {
+            return res.status(400).json({
+                mensaje: "Número de jornada inválido"
+            });
+        }
 
         const { fecha_inicio, fecha_cierre } = req.body;
+
+        if (!fecha_inicio || !fecha_cierre) {
+            return res.status(400).json({
+                mensaje: "fecha_inicio y fecha_cierre son obligatorias"
+            });
+        }
+
+        if (isNaN(Date.parse(fecha_inicio)) || isNaN(Date.parse(fecha_cierre))) {
+            return res.status(400).json({
+                mensaje: "Las fechas proporcionadas no son válidas"
+            });
+        }
+
+        if (new Date(fecha_cierre) <= new Date(fecha_inicio)) {
+            return res.status(400).json({
+                mensaje: "fecha_cierre debe ser posterior a fecha_inicio"
+            });
+        }
 
         const resultado = await pool.query(
             `
@@ -217,6 +259,12 @@ const actualizarJornada = async (req, res) => {
       `,
             [fecha_inicio, fecha_cierre, numero]
         );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({
+                mensaje: "Jornada no encontrada"
+            });
+        }
 
         res.json(resultado.rows[0]);
 
@@ -305,13 +353,20 @@ const eliminarJornada = async (req, res) => {
 
         const { numero } = req.params;
 
-        await pool.query(
+        const resultado = await pool.query(
             `
       DELETE FROM jornadas
       WHERE numero = $1
+      RETURNING id
       `,
             [numero]
         );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({
+                mensaje: "Jornada no encontrada"
+            });
+        }
 
         res.json({
             mensaje: "Jornada eliminada correctamente"

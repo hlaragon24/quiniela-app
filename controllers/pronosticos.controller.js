@@ -267,35 +267,36 @@ const guardarPronosticosJornada = async (req, res) => {
       });
     }
 
-    for (const p of pronosticos) {
-      await client.query(
-        `
-        INSERT INTO pronosticos
-          (
-            usuario_id,
-            partido_id,
-            resultado,
-            marcador_local,
-            marcador_visitante
-          )
-        VALUES
-          ($1, $2, $3, $4, $5)
-        ON CONFLICT (usuario_id, partido_id)
-        DO UPDATE SET
-          resultado = EXCLUDED.resultado,
-          marcador_local = EXCLUDED.marcador_local,
-          marcador_visitante = EXCLUDED.marcador_visitante,
-          updated_at = NOW()
-        `,
-        [
-          usuario_id,
-          Number(p.partido_id),
-          p.resultado,
-          Number(p.marcador_local),
-          Number(p.marcador_visitante)
-        ]
-      );
-    }
+    const idsPartidosArr = pronosticos.map((p) => Number(p.partido_id));
+    const resultadosArr = pronosticos.map((p) => p.resultado);
+    const marcadoresLocalArr = pronosticos.map((p) => Number(p.marcador_local));
+    const marcadoresVisitanteArr = pronosticos.map((p) => Number(p.marcador_visitante));
+
+    await client.query(
+      `
+      INSERT INTO pronosticos
+        (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
+      SELECT
+        $1,
+        t.partido_id,
+        t.resultado,
+        t.marcador_local,
+        t.marcador_visitante
+      FROM unnest(
+        $2::int[],
+        $3::text[],
+        $4::int[],
+        $5::int[]
+      ) AS t(partido_id, resultado, marcador_local, marcador_visitante)
+      ON CONFLICT (usuario_id, partido_id)
+      DO UPDATE SET
+        resultado = EXCLUDED.resultado,
+        marcador_local = EXCLUDED.marcador_local,
+        marcador_visitante = EXCLUDED.marcador_visitante,
+        updated_at = NOW()
+      `,
+      [usuario_id, idsPartidosArr, resultadosArr, marcadoresLocalArr, marcadoresVisitanteArr]
+    );
 
     await client.query("COMMIT");
 
