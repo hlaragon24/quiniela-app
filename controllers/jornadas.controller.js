@@ -3,59 +3,39 @@ const { resolverTorneoId } = require("../utils/torneo");
 
 
 const obtenerJornadaPorNumero = async (req, res) => {
-
     try {
-
         const { numero } = req.params;
+        const torneoId = await resolverTorneoId(req.query.torneo_id);
 
         const resultado = await pool.query(
-            `
-            SELECT *
-            FROM jornadas
-            WHERE numero = $1
-            `,
-            [numero]
+            `SELECT * FROM jornadas WHERE numero = $1 AND torneo_id = $2 LIMIT 1`,
+            [numero, torneoId]
         );
 
         if (resultado.rows.length === 0) {
-
-            return res.status(404).json({
-                mensaje: "Jornada no encontrada"
-            });
-
+            return res.status(404).json({ mensaje: "Jornada no encontrada" });
         }
 
         res.json(resultado.rows[0]);
 
     } catch (error) {
-
+        if (error.status) {
+            return res.status(error.status).json({ mensaje: error.mensaje });
+        }
         console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error obteniendo jornada"
-        });
-
+        res.status(500).json({ mensaje: "Error obteniendo jornada" });
     }
-
 };
 
+
 const crearJornada = async (req, res) => {
-
     try {
-
-        const {
-            numero,
-            fecha_inicio,
-            fecha_cierre,
-            torneo_id
-        } = req.body;
+        const { numero, fecha_inicio, fecha_cierre, torneo_id } = req.body;
 
         if (!numero || !fecha_inicio || !fecha_cierre || !torneo_id) {
-
             return res.status(400).json({
                 mensaje: "Datos incompletos. Se requiere: numero, fecha_inicio, fecha_cierre, torneo_id"
             });
-
         }
 
         const torneoIdNum = Number(torneo_id);
@@ -69,12 +49,9 @@ const crearJornada = async (req, res) => {
         }
 
         const jornada = await pool.query(
-            `
-            INSERT INTO jornadas
-            (numero, fecha_inicio, fecha_cierre, torneo_id)
-            VALUES ($1,$2,$3,$4)
-            RETURNING *
-            `,
+            `INSERT INTO jornadas (numero, fecha_inicio, fecha_cierre, torneo_id)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
             [numero, fecha_inicio, fecha_cierre, torneoIdNum]
         );
 
@@ -84,22 +61,19 @@ const crearJornada = async (req, res) => {
         });
 
     } catch (error) {
-
+        if (error.code === "23505") {
+            return res.status(400).json({
+                mensaje: "Ya existe una jornada con ese número en este torneo"
+            });
+        }
         console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error creando jornada"
-        });
-
+        res.status(500).json({ mensaje: "Error creando jornada" });
     }
-
 };
 
 
 const obtenerJornadas = async (req, res) => {
-
     try {
-
         const torneoIdParam = req.query.torneo_id;
         let torneoId = null;
 
@@ -117,119 +91,73 @@ const obtenerJornadas = async (req, res) => {
 
         res.json(result.rows);
 
-    }
-
-    catch (error) {
-
+    } catch (error) {
         if (error.status) {
             return res.status(error.status).json({ mensaje: error.mensaje });
         }
-
         console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error obteniendo jornadas"
-        });
-
+        res.status(500).json({ mensaje: "Error obteniendo jornadas" });
     }
-
 };
 
+
 const obtenerEstadoJornada = async (req, res) => {
-
     try {
-
         const { numero } = req.params;
+        const torneoId = await resolverTorneoId(req.query.torneo_id);
 
         const resultado = await pool.query(
-            `
-      SELECT fecha_cierre
-      FROM jornadas
-      WHERE numero = $1
-      `,
-            [numero]
+            `SELECT fecha_cierre FROM jornadas WHERE numero = $1 AND torneo_id = $2 LIMIT 1`,
+            [numero, torneoId]
         );
 
         if (resultado.rows.length === 0) {
-
-            return res.status(404).json({
-                mensaje: "Jornada no encontrada"
-            });
-
+            return res.status(404).json({ mensaje: "Jornada no encontrada" });
         }
 
-        const fechaCierre = new Date(
-            resultado.rows[0].fecha_cierre
-        );
-
+        const fechaCierre = new Date(resultado.rows[0].fecha_cierre);
         const ahora = new Date();
 
-        res.json({
-            abierta: ahora < fechaCierre
-        });
+        res.json({ abierta: ahora < fechaCierre });
 
     } catch (error) {
-
+        if (error.status) {
+            return res.status(error.status).json({ mensaje: error.mensaje });
+        }
         console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error consultando estado jornada"
-        });
-
+        res.status(500).json({ mensaje: "Error consultando estado jornada" });
     }
-
 };
 
+
 const obtenerUltimaJornada = async (req, res) => {
-
     try {
-
         const resultado = await pool.query(`
-            SELECT numero
-            FROM jornadas
-            ORDER BY numero DESC
-            LIMIT 1
+            SELECT numero FROM jornadas ORDER BY numero DESC LIMIT 1
         `);
 
         if (!resultado.rows.length) {
-
-            return res.json({
-                jornada: null
-            });
-
+            return res.json({ jornada: null });
         }
 
-        res.json({
-            jornada: resultado.rows[0].numero
-        });
+        res.json({ jornada: resultado.rows[0].numero });
 
-    }
-
-    catch (error) {
-
+    } catch (error) {
         console.error("Error obtenerUltimaJornada:", error);
-
-        res.status(500).json({
-            mensaje: "Error obteniendo última jornada"
-        });
-
+        res.status(500).json({ mensaje: "Error obteniendo última jornada" });
     }
-
 };
 
+
 const actualizarJornada = async (req, res) => {
-
     try {
-
         const numero = Number(req.params.numero);
 
         if (!Number.isInteger(numero) || numero <= 0) {
-            return res.status(400).json({
-                mensaje: "Número de jornada inválido"
-            });
+            return res.status(400).json({ mensaje: "Número de jornada inválido" });
         }
 
-        const { fecha_inicio, fecha_cierre } = req.body;
+        const { fecha_inicio, fecha_cierre, torneo_id } = req.body;
 
         if (!fecha_inicio || !fecha_cierre) {
             return res.status(400).json({
@@ -238,9 +166,7 @@ const actualizarJornada = async (req, res) => {
         }
 
         if (isNaN(Date.parse(fecha_inicio)) || isNaN(Date.parse(fecha_cierre))) {
-            return res.status(400).json({
-                mensaje: "Las fechas proporcionadas no son válidas"
-            });
+            return res.status(400).json({ mensaje: "Las fechas proporcionadas no son válidas" });
         }
 
         if (new Date(fecha_cierre) <= new Date(fecha_inicio)) {
@@ -249,139 +175,101 @@ const actualizarJornada = async (req, res) => {
             });
         }
 
+        const torneoId = await resolverTorneoId(torneo_id);
+
         const resultado = await pool.query(
-            `
-      UPDATE jornadas
-      SET fecha_inicio = $1,
-          fecha_cierre = $2
-      WHERE numero = $3
-      RETURNING *
-      `,
-            [fecha_inicio, fecha_cierre, numero]
+            `UPDATE jornadas
+             SET fecha_inicio = $1, fecha_cierre = $2
+             WHERE numero = $3 AND torneo_id = $4
+             RETURNING *`,
+            [fecha_inicio, fecha_cierre, numero, torneoId]
         );
 
         if (resultado.rows.length === 0) {
-            return res.status(404).json({
-                mensaje: "Jornada no encontrada"
-            });
+            return res.status(404).json({ mensaje: "Jornada no encontrada" });
         }
 
         res.json(resultado.rows[0]);
 
     } catch (error) {
-
+        if (error.status) {
+            return res.status(error.status).json({ mensaje: error.mensaje });
+        }
         console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error actualizando jornada"
-        });
-
+        res.status(500).json({ mensaje: "Error actualizando jornada" });
     }
-
 };
 
 
 const cerrarJornada = async (req, res) => {
-
     try {
-
         const { numero } = req.params;
+        const torneoId = await resolverTorneoId(req.body.torneo_id);
 
         await pool.query(
-            `
-            UPDATE jornadas
-            SET
-                fecha_cierre = NOW(),
-                estado = 'cerrada'
-            WHERE numero = $1
-            `,
-            [numero]
+            `UPDATE jornadas
+             SET fecha_cierre = NOW(), estado = 'cerrada'
+             WHERE numero = $1 AND torneo_id = $2`,
+            [numero, torneoId]
         );
 
-        res.json({
-            mensaje: "Jornada cerrada correctamente"
-        });
+        res.json({ mensaje: "Jornada cerrada correctamente" });
 
     } catch (error) {
-
+        if (error.status) {
+            return res.status(error.status).json({ mensaje: error.mensaje });
+        }
         console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error cerrando jornada"
-        });
-
+        res.status(500).json({ mensaje: "Error cerrando jornada" });
     }
-
 };
 
 
 const abrirJornada = async (req, res) => {
-
     try {
-
         const { numero } = req.params;
+        const torneoId = await resolverTorneoId(req.body?.torneo_id || req.query.torneo_id);
 
         await pool.query(
-            `
-            UPDATE jornadas
-            SET estado = 'abierta'
-            WHERE numero = $1
-            `,
-            [numero]
+            `UPDATE jornadas SET estado = 'abierta' WHERE numero = $1 AND torneo_id = $2`,
+            [numero, torneoId]
         );
 
-        res.json({
-            mensaje: "Jornada abierta correctamente"
-        });
+        res.json({ mensaje: "Jornada abierta correctamente" });
 
     } catch (error) {
-
+        if (error.status) {
+            return res.status(error.status).json({ mensaje: error.mensaje });
+        }
         console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error abriendo jornada"
-        });
-
+        res.status(500).json({ mensaje: "Error abriendo jornada" });
     }
-
 };
 
 
 const eliminarJornada = async (req, res) => {
-
     try {
-
         const { numero } = req.params;
+        const torneoId = await resolverTorneoId(req.query.torneo_id || req.body?.torneo_id);
 
         const resultado = await pool.query(
-            `
-      DELETE FROM jornadas
-      WHERE numero = $1
-      RETURNING id
-      `,
-            [numero]
+            `DELETE FROM jornadas WHERE numero = $1 AND torneo_id = $2 RETURNING id`,
+            [numero, torneoId]
         );
 
         if (resultado.rows.length === 0) {
-            return res.status(404).json({
-                mensaje: "Jornada no encontrada"
-            });
+            return res.status(404).json({ mensaje: "Jornada no encontrada" });
         }
 
-        res.json({
-            mensaje: "Jornada eliminada correctamente"
-        });
+        res.json({ mensaje: "Jornada eliminada correctamente" });
 
     } catch (error) {
-
+        if (error.status) {
+            return res.status(error.status).json({ mensaje: error.mensaje });
+        }
         console.error(error);
-
-        res.status(500).json({
-            mensaje: "Error eliminando jornada"
-        });
-
+        res.status(500).json({ mensaje: "Error eliminando jornada" });
     }
-
 };
 
 
