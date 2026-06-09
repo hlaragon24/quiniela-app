@@ -297,25 +297,34 @@ const obtenerPerfilUsuario = async (req, res) => {
             THEN 1
             ELSE 0
           END
-        ),0) AS marcadores_exactos
+        ),0) AS marcadores_exactos,
+
+        COALESCE(SUM(pr.puntos), 0) AS puntos_totales,
+
+        COUNT(DISTINCT p.jornada_id) AS jornadas_jugadas
 
       FROM pronosticos pr
+      JOIN partidos p ON p.id = pr.partido_id
       WHERE pr.usuario_id = $1
       `,
       [usuarioId]
     );
 
+    const stats = estadisticas.rows[0];
+    const pronosticosRealizados = Number(stats.pronosticos_realizados);
+    const aciertos = Number(stats.aciertos);
+    const efectividad = pronosticosRealizados > 0
+      ? Math.round((aciertos / pronosticosRealizados) * 100)
+      : 0;
+
     return res.json({
       ...usuario.rows[0],
-      pronosticosRealizados: Number(
-        estadisticas.rows[0].pronosticos_realizados
-      ),
-      aciertos: Number(
-        estadisticas.rows[0].aciertos
-      ),
-      marcadoresExactos: Number(
-        estadisticas.rows[0].marcadores_exactos
-      )
+      pronosticosRealizados,
+      aciertos,
+      marcadoresExactos: Number(stats.marcadores_exactos),
+      puntosTotales: Number(stats.puntos_totales),
+      jornadasJugadas: Number(stats.jornadas_jugadas),
+      efectividad
     });
 
   } catch (error) {

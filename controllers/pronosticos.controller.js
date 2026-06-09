@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { resolverTorneoId } = require("../utils/torneo");
 
 /*
 ====================================
@@ -327,6 +328,8 @@ const obtenerPronosticosUsuario = async (req, res) => {
   const usuario_id = req.usuario.id;
 
   try {
+    const torneoId = await resolverTorneoId(req.query.torneo_id);
+
     const resultado = await pool.query(
       `
       SELECT
@@ -368,14 +371,18 @@ const obtenerPronosticosUsuario = async (req, res) => {
         ON p.id = r.partido_id
 
       WHERE pr.usuario_id = $1
+        AND j.torneo_id = $2
 
       ORDER BY j.numero, p.id
       `,
-      [usuario_id]
+      [usuario_id, torneoId]
     );
 
     return res.json(resultado.rows);
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.mensaje });
+    }
     console.error("Error obteniendo pronósticos usuario:", error);
 
     return res.status(500).json({
@@ -439,6 +446,8 @@ const obtenerPronosticosUsuarioPorJornada = async (req, res) => {
 
 const obtenerHistoricoGeneralPronosticos = async (req, res) => {
   try {
+    const torneoId = await resolverTorneoId(req.query.torneo_id);
+
     const resultado = await pool.query(`
       SELECT
         j.id AS jornada_id,
@@ -524,6 +533,7 @@ const obtenerHistoricoGeneralPronosticos = async (req, res) => {
 
       INNER JOIN jornadas j
         ON j.id = p.jornada_id
+       AND j.torneo_id = $1
 
       LEFT JOIN resultados r
         ON r.partido_id = p.id
@@ -532,11 +542,14 @@ const obtenerHistoricoGeneralPronosticos = async (req, res) => {
         j.numero DESC,
         u.nombre ASC,
         p.id ASC
-    `);
+    `, [torneoId]);
 
     return res.json(resultado.rows);
 
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.mensaje });
+    }
     console.error("Error obteniendo histórico general:", error);
 
     return res.status(500).json({
