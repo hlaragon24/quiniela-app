@@ -7,6 +7,7 @@ const soloAdmin = require("../middleware/admin.middleware");
 
 router.get("/", controller.obtenerTorneos);
 router.get("/activo", controller.obtenerTorneoActivo);
+router.get("/mis-torneos", authMiddleware, controller.obtenerMisTorneos);
 router.get("/:id", controller.obtenerTorneoPorId);
 
 router.post("/", authMiddleware, soloAdmin, controller.crearTorneo);

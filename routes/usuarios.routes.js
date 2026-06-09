@@ -45,4 +45,27 @@ router.post(
   validarAdmin,
   controller.crearUsuario
 );
+
+// Torneos por usuario
+router.get(
+  "/:id/torneos",
+  authMiddleware,
+  validarAdmin,
+  controller.obtenerTorneosPorUsuario
+);
+
+router.post(
+  "/:id/torneos/:torneoId",
+  authMiddleware,
+  validarAdmin,
+  controller.asignarUsuarioATorneo
+);
+
+router.delete(
+  "/:id/torneos/:torneoId",
+  authMiddleware,
+  validarAdmin,
+  controller.removerUsuarioDeTorneo
+);
+
 module.exports = router;
