@@ -5,7 +5,6 @@ const router = express.Router();
 const controller = require("../controllers/jornadas.controller");
 
 const authMiddleware = require("../middleware/auth.middleware");
-
 const validarAdmin = require("../middleware/admin.middleware");
 
 
@@ -52,5 +51,12 @@ router.delete(
   validarAdmin,
   controller.eliminarJornada
 );
+
+// Inscripción por jornada (torneos tipo='jornada')
+router.post("/:jornadaId/inscribir", authMiddleware, controller.inscribirJugador);
+router.delete("/:jornadaId/inscribir", authMiddleware, controller.desinscribirJugador);
+router.get("/:jornadaId/participantes", authMiddleware, validarAdmin, controller.obtenerParticipantesJornada);
+router.post("/:jornadaId/jugadores/:usuarioId", authMiddleware, validarAdmin, controller.asignarJugadorAJornada);
+router.delete("/:jornadaId/jugadores/:usuarioId", authMiddleware, validarAdmin, controller.removerJugadorDeJornada);
 
 module.exports = router;

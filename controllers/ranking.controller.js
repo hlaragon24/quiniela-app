@@ -113,6 +113,9 @@ const obtenerRankingGeneralBase = `
       ), 0) AS resultados_correctos
 
     FROM usuarios u
+    INNER JOIN usuarios_torneos ut
+      ON ut.usuario_id = u.id
+     AND ut.torneo_id = $1
 
     LEFT JOIN pronosticos pr
       ON u.id = pr.usuario_id
@@ -145,6 +148,9 @@ const obtenerRankingGeneralBase = `
       ca.equipo AS campeon_real
 
     FROM usuarios u
+    INNER JOIN usuarios_torneos ut
+      ON ut.usuario_id = u.id
+     AND ut.torneo_id = $1
 
     LEFT JOIN campeon_pronosticos cp
       ON cp.usuario_id = u.id
@@ -377,16 +383,26 @@ const obtenerRankingPorJornada = async (req, res) => {
   }
 
   try {
-    const jornadaExiste = await pool.query(
-      `SELECT id, numero, estado FROM jornadas WHERE id = $1`,
+    const jornadaResult = await pool.query(
+      `SELECT j.id, j.numero, j.estado, j.torneo_id, t.tipo AS torneo_tipo
+       FROM jornadas j JOIN torneos t ON j.torneo_id = t.id
+       WHERE j.id = $1`,
       [jornada_id]
     );
 
-    if (jornadaExiste.rows.length === 0) {
+    if (jornadaResult.rows.length === 0) {
       return res.status(404).json({ mensaje: "Jornada no encontrada" });
     }
 
+    const jornada = jornadaResult.rows[0];
+
+    // Filtra participantes según el tipo de torneo
+    const participantesSubquery = jornada.torneo_tipo === "jornada"
+      ? `SELECT usuario_id FROM usuarios_jornadas WHERE jornada_id = $1`
+      : `SELECT usuario_id FROM usuarios_torneos WHERE torneo_id = ${jornada.torneo_id}`;
+
     const resultado = await pool.query(`
+      WITH elegibles AS (${participantesSubquery})
       SELECT
         DENSE_RANK() OVER (
           ORDER BY
@@ -395,8 +411,7 @@ const obtenerRankingPorJornada = async (req, res) => {
               CASE
                 WHEN pr.marcador_local = r.goles_local
                  AND pr.marcador_visitante = r.goles_visitante
-                THEN 1
-                ELSE 0
+                THEN 1 ELSE 0
               END
             ), 0) DESC,
             COALESCE(SUM(
@@ -407,8 +422,7 @@ const obtenerRankingPorJornada = async (req, res) => {
                     WHEN r.goles_visitante > r.goles_local THEN 'V'
                     ELSE 'E'
                   END
-                THEN 1
-                ELSE 0
+                THEN 1 ELSE 0
               END
             ), 0) DESC,
             u.nombre ASC
@@ -418,19 +432,15 @@ const obtenerRankingPorJornada = async (req, res) => {
         u.nombre,
 
         COALESCE(SUM(pr.puntos), 0) AS total,
-
         COUNT(pr.id) AS pronosticos_realizados,
 
-        COALESCE(SUM(
-          CASE WHEN pr.puntos > 0 THEN 1 ELSE 0 END
-        ), 0) AS aciertos,
+        COALESCE(SUM(CASE WHEN pr.puntos > 0 THEN 1 ELSE 0 END), 0) AS aciertos,
 
         COALESCE(SUM(
           CASE
             WHEN pr.marcador_local = r.goles_local
              AND pr.marcador_visitante = r.goles_visitante
-            THEN 1
-            ELSE 0
+            THEN 1 ELSE 0
           END
         ), 0) AS marcadores_exactos,
 
@@ -442,34 +452,22 @@ const obtenerRankingPorJornada = async (req, res) => {
                 WHEN r.goles_visitante > r.goles_local THEN 'V'
                 ELSE 'E'
               END
-            THEN 1
-            ELSE 0
+            THEN 1 ELSE 0
           END
         ), 0) AS resultados_correctos
 
       FROM usuarios u
-
-      LEFT JOIN partidos p
-        ON p.jornada_id = $1
-
-      LEFT JOIN pronosticos pr
-        ON pr.usuario_id = u.id
-       AND pr.partido_id = p.id
-
-      LEFT JOIN resultados r
-        ON p.id = r.partido_id
+      INNER JOIN elegibles e ON e.usuario_id = u.id
+      LEFT JOIN partidos p ON p.jornada_id = $1
+      LEFT JOIN pronosticos pr ON pr.usuario_id = u.id AND pr.partido_id = p.id
+      LEFT JOIN resultados r ON p.id = r.partido_id
 
       GROUP BY u.id, u.nombre
-
-      ORDER BY
-        total DESC,
-        marcadores_exactos DESC,
-        resultados_correctos DESC,
-        u.nombre ASC
+      ORDER BY total DESC, marcadores_exactos DESC, resultados_correctos DESC, u.nombre ASC
     `, [jornada_id]);
 
     return res.json({
-      jornada: jornadaExiste.rows[0],
+      jornada: { id: jornada.id, numero: jornada.numero, estado: jornada.estado },
       ranking: resultado.rows
     });
 
@@ -489,6 +487,15 @@ const obtenerGanadoresPorTorneo = async (req, res) => {
   try {
     const torneoId = await resolverTorneoId(req.params.torneoId ?? req.query.torneo_id);
 
+    const torneoTipoResult = await pool.query(
+      `SELECT tipo FROM torneos WHERE id = $1`, [torneoId]
+    );
+    const torneoTipo = torneoTipoResult.rows[0]?.tipo ?? "temporada";
+
+    const participantesJoin = torneoTipo === "jornada"
+      ? `INNER JOIN usuarios_jornadas uj ON uj.usuario_id = u.id AND uj.jornada_id = j.id`
+      : `INNER JOIN usuarios_torneos ut ON ut.usuario_id = u.id AND ut.torneo_id = $1`;
+
     const resultado = await pool.query(`
       SELECT
         j.id AS jornada_id,
@@ -504,11 +511,9 @@ const obtenerGanadoresPorTorneo = async (req, res) => {
           u.nombre,
           COALESCE(SUM(pr.puntos), 0) AS total
         FROM usuarios u
-        LEFT JOIN pronosticos pr
-          ON pr.usuario_id = u.id
-        LEFT JOIN partidos p
-          ON pr.partido_id = p.id
-         AND p.jornada_id = j.id
+        ${participantesJoin}
+        LEFT JOIN pronosticos pr ON pr.usuario_id = u.id
+        LEFT JOIN partidos p ON pr.partido_id = p.id AND p.jornada_id = j.id
         GROUP BY u.id, u.nombre
         ORDER BY total DESC, u.nombre ASC
         LIMIT 1

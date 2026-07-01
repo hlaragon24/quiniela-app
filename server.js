@@ -48,6 +48,11 @@ app.get("/", (req, res) => {
   res.send("Servidor funcionando 🚀 Quiniela App activa");
 });
 
+// Health check
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // Ruta no encontrada
 app.use((req, res) => {
   res.status(404).json({

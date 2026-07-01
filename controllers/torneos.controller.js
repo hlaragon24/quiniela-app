@@ -6,6 +6,7 @@ const esEnteroPositivo = (v) => {
 };
 
 const estadosValidos = ["abierto", "finalizado"];
+const tiposValidos = ["temporada", "jornada"];
 
 /*
 ====================================
@@ -15,7 +16,7 @@ OBTENER TODOS LOS TORNEOS
 const obtenerTorneos = async (req, res) => {
   try {
     const resultado = await pool.query(`
-      SELECT id, nombre, temporada, estado, activo, fecha_inicio, fecha_fin, created_at
+      SELECT id, nombre, temporada, tipo, estado, activo, fecha_inicio, fecha_fin, created_at
       FROM torneos
       ORDER BY id DESC
     `);
@@ -34,7 +35,7 @@ OBTENER TORNEO ACTIVO
 const obtenerTorneoActivo = async (req, res) => {
   try {
     const resultado = await pool.query(`
-      SELECT id, nombre, temporada, estado, activo, fecha_inicio, fecha_fin, created_at
+      SELECT id, nombre, temporada, tipo, estado, activo, fecha_inicio, fecha_fin, created_at
       FROM torneos
       WHERE activo = true
       LIMIT 1
@@ -81,12 +82,14 @@ CREAR TORNEO (ADMIN)
 ====================================
 */
 const crearTorneo = async (req, res) => {
-  const { nombre, temporada, fecha_inicio, fecha_fin } = req.body;
+  const { nombre, temporada, fecha_inicio, fecha_fin, tipo } = req.body;
 
   if (!nombre || typeof nombre !== "string" || nombre.trim().length < 2) {
     return res.status(400).json({ mensaje: "Nombre de torneo inválido" });
   }
-
+  if (tipo && !tiposValidos.includes(tipo)) {
+    return res.status(400).json({ mensaje: "Tipo inválido. Valores válidos: temporada, jornada" });
+  }
   if (fecha_inicio && isNaN(Date.parse(fecha_inicio))) {
     return res.status(400).json({ mensaje: "fecha_inicio inválida" });
   }
@@ -99,10 +102,10 @@ const crearTorneo = async (req, res) => {
 
   try {
     const resultado = await pool.query(
-      `INSERT INTO torneos (nombre, temporada, fecha_inicio, fecha_fin)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO torneos (nombre, temporada, fecha_inicio, fecha_fin, tipo)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [nombre.trim(), temporada || null, fecha_inicio || null, fecha_fin || null]
+      [nombre.trim(), temporada || null, fecha_inicio || null, fecha_fin || null, tipo || "temporada"]
     );
     return res.status(201).json({
       mensaje: "Torneo creado correctamente",
@@ -125,13 +128,16 @@ const actualizarTorneo = async (req, res) => {
     return res.status(400).json({ mensaje: "ID de torneo inválido" });
   }
 
-  const { nombre, temporada, estado, fecha_inicio, fecha_fin } = req.body;
+  const { nombre, temporada, estado, fecha_inicio, fecha_fin, tipo } = req.body;
 
   if (nombre !== undefined && (typeof nombre !== "string" || nombre.trim().length < 2)) {
     return res.status(400).json({ mensaje: "Nombre de torneo inválido" });
   }
   if (estado !== undefined && !estadosValidos.includes(estado)) {
     return res.status(400).json({ mensaje: "Estado inválido. Valores válidos: abierto, finalizado" });
+  }
+  if (tipo !== undefined && !tiposValidos.includes(tipo)) {
+    return res.status(400).json({ mensaje: "Tipo inválido. Valores válidos: temporada, jornada" });
   }
   if (fecha_inicio && isNaN(Date.parse(fecha_inicio))) {
     return res.status(400).json({ mensaje: "fecha_inicio inválida" });
@@ -144,12 +150,13 @@ const actualizarTorneo = async (req, res) => {
     const resultado = await pool.query(
       `UPDATE torneos
        SET
-         nombre      = COALESCE($1, nombre),
-         temporada   = COALESCE($2, temporada),
-         estado      = COALESCE($3, estado),
+         nombre       = COALESCE($1, nombre),
+         temporada    = COALESCE($2, temporada),
+         estado       = COALESCE($3, estado),
          fecha_inicio = COALESCE($4, fecha_inicio),
-         fecha_fin    = COALESCE($5, fecha_fin)
-       WHERE id = $6
+         fecha_fin    = COALESCE($5, fecha_fin),
+         tipo         = COALESCE($6, tipo)
+       WHERE id = $7
        RETURNING *`,
       [
         nombre ? nombre.trim() : null,
@@ -157,6 +164,7 @@ const actualizarTorneo = async (req, res) => {
         estado || null,
         fecha_inicio || null,
         fecha_fin || null,
+        tipo || null,
         id
       ]
     );

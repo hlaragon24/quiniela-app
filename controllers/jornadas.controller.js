@@ -49,8 +49,8 @@ const crearJornada = async (req, res) => {
         }
 
         const jornada = await pool.query(
-            `INSERT INTO jornadas (numero, fecha_inicio, fecha_cierre, torneo_id)
-             VALUES ($1, $2, $3, $4)
+            `INSERT INTO jornadas (numero, fecha_inicio, fecha_cierre, torneo_id, estado)
+             VALUES ($1, $2, $3, $4, 'abierta')
              RETURNING *`,
             [numero, fecha_inicio, fecha_cierre, torneoIdNum]
         );
@@ -132,9 +132,12 @@ const obtenerEstadoJornada = async (req, res) => {
 
 const obtenerUltimaJornada = async (req, res) => {
     try {
-        const resultado = await pool.query(`
-            SELECT numero FROM jornadas ORDER BY numero DESC LIMIT 1
-        `);
+        const torneoId = await resolverTorneoId(req.query.torneo_id);
+
+        const resultado = await pool.query(
+            `SELECT numero FROM jornadas WHERE torneo_id = $1 ORDER BY numero DESC LIMIT 1`,
+            [torneoId]
+        );
 
         if (!resultado.rows.length) {
             return res.json({ jornada: null });
@@ -143,6 +146,9 @@ const obtenerUltimaJornada = async (req, res) => {
         res.json({ jornada: resultado.rows[0].numero });
 
     } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ mensaje: error.mensaje });
+        }
         console.error("Error obtenerUltimaJornada:", error);
         res.status(500).json({ mensaje: "Error obteniendo última jornada" });
     }
@@ -273,6 +279,222 @@ const eliminarJornada = async (req, res) => {
 };
 
 
+/*
+====================================
+INSCRIPCIÓN POR JORNADA
+Solo para torneos con tipo = 'jornada'
+====================================
+*/
+
+const _resolverJornadaConTipo = async (client, jornadaId) => {
+    const r = await client.query(
+        `SELECT j.id, j.numero, j.fecha_cierre, j.estado, j.torneo_id, t.tipo
+         FROM jornadas j
+         JOIN torneos t ON j.torneo_id = t.id
+         WHERE j.id = $1`,
+        [jornadaId]
+    );
+    return r.rows[0] || null;
+};
+
+const inscribirJugador = async (req, res) => {
+    const usuarioId = req.usuario.id;
+    const jornadaId = Number(req.params.jornadaId);
+
+    if (!Number.isInteger(jornadaId) || jornadaId <= 0) {
+        return res.status(400).json({ mensaje: "ID de jornada inválido" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        const jornada = await _resolverJornadaConTipo(client, jornadaId);
+
+        if (!jornada) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ mensaje: "Jornada no encontrada" });
+        }
+        if (jornada.tipo !== "jornada") {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ mensaje: "Este torneo no permite inscripción por jornada individual" });
+        }
+        if (jornada.estado === "finalizada") {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ mensaje: "No puedes inscribirte a una jornada finalizada" });
+        }
+        if (jornada.fecha_cierre && new Date() >= new Date(jornada.fecha_cierre)) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ mensaje: "La jornada ya cerró, no puedes inscribirte" });
+        }
+
+        const yaInscrito = await client.query(
+            `SELECT 1 FROM usuarios_jornadas WHERE usuario_id = $1 AND jornada_id = $2`,
+            [usuarioId, jornadaId]
+        );
+        if (yaInscrito.rows.length > 0) {
+            await client.query("ROLLBACK");
+            return res.json({ mensaje: "Ya estás inscrito en esta jornada" });
+        }
+
+        await client.query(
+            `INSERT INTO usuarios_jornadas (usuario_id, jornada_id) VALUES ($1, $2)`,
+            [usuarioId, jornadaId]
+        );
+
+        await client.query(
+            `INSERT INTO pagos_quiniela (usuario_id, torneo_id, jornada_id, monto, pagado)
+             VALUES ($1, $2, $3, 0, false)
+             ON CONFLICT (usuario_id, jornada_id) WHERE jornada_id IS NOT NULL DO NOTHING`,
+            [usuarioId, jornada.torneo_id, jornadaId]
+        );
+
+        await client.query("COMMIT");
+        return res.json({ mensaje: "Inscrito a la jornada correctamente", jornada_id: jornadaId, jornada_numero: jornada.numero });
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Error inscribiendo jugador:", error);
+        return res.status(500).json({ mensaje: "Error inscribiendo jugador" });
+    } finally {
+        client.release();
+    }
+};
+
+const desinscribirJugador = async (req, res) => {
+    const usuarioId = req.usuario.id;
+    const jornadaId = Number(req.params.jornadaId);
+
+    if (!Number.isInteger(jornadaId) || jornadaId <= 0) {
+        return res.status(400).json({ mensaje: "ID de jornada inválido" });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `DELETE FROM usuarios_jornadas WHERE usuario_id = $1 AND jornada_id = $2 RETURNING id`,
+            [usuarioId, jornadaId]
+        );
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ mensaje: "No estabas inscrito en esta jornada" });
+        }
+        return res.json({ mensaje: "Desinscrito de la jornada correctamente" });
+    } catch (error) {
+        console.error("Error desinscribiendo jugador:", error);
+        return res.status(500).json({ mensaje: "Error desinscribiendo jugador" });
+    }
+};
+
+const obtenerParticipantesJornada = async (req, res) => {
+    const jornadaId = Number(req.params.jornadaId);
+
+    if (!Number.isInteger(jornadaId) || jornadaId <= 0) {
+        return res.status(400).json({ mensaje: "ID de jornada inválido" });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `SELECT u.id, u.nombre, u.email, uj.created_at AS inscrito_en,
+                    COALESCE(p.pagado, false) AS pagado, COALESCE(p.monto, 0) AS monto
+             FROM usuarios_jornadas uj
+             JOIN usuarios u ON u.id = uj.usuario_id
+             LEFT JOIN pagos_quiniela p ON p.usuario_id = u.id AND p.jornada_id = uj.jornada_id
+             WHERE uj.jornada_id = $1
+             ORDER BY u.nombre ASC`,
+            [jornadaId]
+        );
+        return res.json(resultado.rows);
+    } catch (error) {
+        console.error("Error obteniendo participantes:", error);
+        return res.status(500).json({ mensaje: "Error obteniendo participantes" });
+    }
+};
+
+const asignarJugadorAJornada = async (req, res) => {
+    const jornadaId = Number(req.params.jornadaId);
+    const usuarioId = Number(req.params.usuarioId);
+
+    if (!Number.isInteger(jornadaId) || jornadaId <= 0) {
+        return res.status(400).json({ mensaje: "ID de jornada inválido" });
+    }
+    if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+        return res.status(400).json({ mensaje: "ID de usuario inválido" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        const jornada = await _resolverJornadaConTipo(client, jornadaId);
+        if (!jornada) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ mensaje: "Jornada no encontrada" });
+        }
+        if (jornada.tipo !== "jornada") {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ mensaje: "Este torneo no usa inscripción por jornada" });
+        }
+
+        const usuario = await client.query(
+            `SELECT id FROM usuarios WHERE id = $1 AND rol = 'jugador'`,
+            [usuarioId]
+        );
+        if (usuario.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ mensaje: "Jugador no encontrado" });
+        }
+
+        await client.query(
+            `INSERT INTO usuarios_jornadas (usuario_id, jornada_id) VALUES ($1, $2)
+             ON CONFLICT (usuario_id, jornada_id) DO NOTHING`,
+            [usuarioId, jornadaId]
+        );
+
+        await client.query(
+            `INSERT INTO pagos_quiniela (usuario_id, torneo_id, jornada_id, monto, pagado)
+             VALUES ($1, $2, $3, 0, false)
+             ON CONFLICT (usuario_id, jornada_id) WHERE jornada_id IS NOT NULL DO NOTHING`,
+            [usuarioId, jornada.torneo_id, jornadaId]
+        );
+
+        await client.query("COMMIT");
+        return res.status(201).json({ mensaje: "Jugador asignado a la jornada correctamente" });
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Error asignando jugador a jornada:", error);
+        return res.status(500).json({ mensaje: "Error asignando jugador a jornada" });
+    } finally {
+        client.release();
+    }
+};
+
+const removerJugadorDeJornada = async (req, res) => {
+    const jornadaId = Number(req.params.jornadaId);
+    const usuarioId = Number(req.params.usuarioId);
+
+    if (!Number.isInteger(jornadaId) || jornadaId <= 0) {
+        return res.status(400).json({ mensaje: "ID de jornada inválido" });
+    }
+    if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+        return res.status(400).json({ mensaje: "ID de usuario inválido" });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `DELETE FROM usuarios_jornadas WHERE usuario_id = $1 AND jornada_id = $2 RETURNING id`,
+            [usuarioId, jornadaId]
+        );
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ mensaje: "El jugador no estaba inscrito en esta jornada" });
+        }
+        return res.json({ mensaje: "Jugador removido de la jornada correctamente" });
+    } catch (error) {
+        console.error("Error removiendo jugador de jornada:", error);
+        return res.status(500).json({ mensaje: "Error removiendo jugador de jornada" });
+    }
+};
+
+
 module.exports = {
     obtenerJornadaPorNumero,
     crearJornada,
@@ -282,5 +504,10 @@ module.exports = {
     actualizarJornada,
     cerrarJornada,
     abrirJornada,
-    eliminarJornada
+    eliminarJornada,
+    inscribirJugador,
+    desinscribirJugador,
+    obtenerParticipantesJornada,
+    asignarJugadorAJornada,
+    removerJugadorDeJornada
 };

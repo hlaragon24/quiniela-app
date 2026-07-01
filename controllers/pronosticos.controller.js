@@ -60,10 +60,12 @@ const guardarPronostico = async (req, res) => {
         p.id,
         p.jornada_id,
         j.estado,
-        j.fecha_cierre
+        j.fecha_cierre,
+        j.torneo_id,
+        t.tipo AS torneo_tipo
       FROM partidos p
-      JOIN jornadas j
-        ON p.jornada_id = j.id
+      JOIN jornadas j ON p.jornada_id = j.id
+      JOIN torneos t  ON j.torneo_id = t.id
       WHERE p.id = $1
       `,
       [Number(partido_id)]
@@ -78,6 +80,19 @@ const guardarPronostico = async (req, res) => {
     }
 
     const partido = partidoResult.rows[0];
+
+    if (partido.torneo_tipo === "jornada") {
+      const inscrito = await client.query(
+        `SELECT 1 FROM usuarios_jornadas WHERE usuario_id = $1 AND jornada_id = $2`,
+        [usuario_id, partido.jornada_id]
+      );
+      if (inscrito.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          mensaje: "No estás inscrito en esta jornada"
+        });
+      }
+    }
 
     if (!partido.fecha_cierre) {
       await client.query("ROLLBACK");
@@ -206,10 +221,12 @@ const guardarPronosticosJornada = async (req, res) => {
         p.id,
         p.jornada_id,
         j.estado,
-        j.fecha_cierre
+        j.fecha_cierre,
+        j.torneo_id,
+        t.tipo AS torneo_tipo
       FROM partidos p
-      JOIN jornadas j
-        ON p.jornada_id = j.id
+      JOIN jornadas j ON p.jornada_id = j.id
+      JOIN torneos t  ON j.torneo_id = t.id
       WHERE p.id = ANY($1::int[])
       `,
       [idsPartidos]
@@ -266,6 +283,19 @@ const guardarPronosticosJornada = async (req, res) => {
       return res.status(403).json({
         mensaje: "La jornada ya está bloqueada. No puedes guardar ni modificar pronósticos."
       });
+    }
+
+    if (jornada.torneo_tipo === "jornada") {
+      const inscrito = await client.query(
+        `SELECT 1 FROM usuarios_jornadas WHERE usuario_id = $1 AND jornada_id = $2`,
+        [usuario_id, jornadasIds[0]]
+      );
+      if (inscrito.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          mensaje: "No estás inscrito en esta jornada"
+        });
+      }
     }
 
     const idsPartidosArr = pronosticos.map((p) => Number(p.partido_id));

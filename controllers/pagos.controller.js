@@ -4,34 +4,73 @@ const { resolverTorneoId } = require("../utils/torneo");
 const obtenerPagos = async (req, res) => {
     try {
         const torneoId = await resolverTorneoId(req.query.torneo_id);
+        const jornadaId = req.query.jornada_id ? Number(req.query.jornada_id) : null;
 
+        const torneoResult = await pool.query(
+            `SELECT tipo FROM torneos WHERE id = $1`,
+            [torneoId]
+        );
+        if (torneoResult.rows.length === 0) {
+            return res.status(404).json({ mensaje: "Torneo no encontrado" });
+        }
+
+        const tipo = torneoResult.rows[0].tipo;
+
+        if (tipo === "jornada") {
+            if (!jornadaId || !Number.isInteger(jornadaId) || jornadaId <= 0) {
+                return res.status(400).json({
+                    mensaje: "Para torneos tipo jornada debes enviar jornada_id como query param"
+                });
+            }
+
+            const resultado = await pool.query(`
+                SELECT
+                    u.id AS usuario_id,
+                    u.nombre,
+                    u.email,
+                    p.id AS pago_id,
+                    COALESCE(p.monto, 0) AS monto,
+                    COALESCE(p.pagado, false) AS pagado,
+                    p.fecha_pago,
+                    p.metodo_pago,
+                    p.notas,
+                    p.jornada_id,
+                    p.created_at,
+                    p.updated_at
+                FROM usuarios_jornadas uj
+                JOIN usuarios u ON u.id = uj.usuario_id
+                LEFT JOIN pagos_quiniela p
+                    ON p.usuario_id = u.id
+                    AND p.jornada_id = uj.jornada_id
+                WHERE uj.jornada_id = $1
+                ORDER BY COALESCE(p.pagado, false) ASC, u.nombre ASC
+            `, [jornadaId]);
+
+            return res.json(resultado.rows);
+        }
+
+        // tipo = 'temporada' (comportamiento original)
         const resultado = await pool.query(`
-      SELECT
-        u.id AS usuario_id,
-        u.nombre,
-        u.email,
-
-        p.id AS pago_id,
-        COALESCE(p.monto, 0) AS monto,
-        COALESCE(p.pagado, false) AS pagado,
-        p.fecha_pago,
-        p.metodo_pago,
-        p.notas,
-        p.created_at,
-        p.updated_at
-
-      FROM usuarios u
-
-      LEFT JOIN pagos_quiniela p
-        ON p.usuario_id = u.id
-       AND p.torneo_id = $1
-
-      WHERE u.rol = 'jugador'
-
-      ORDER BY
-        pagado ASC,
-        u.nombre ASC
-    `, [torneoId]);
+            SELECT
+                u.id AS usuario_id,
+                u.nombre,
+                u.email,
+                p.id AS pago_id,
+                COALESCE(p.monto, 0) AS monto,
+                COALESCE(p.pagado, false) AS pagado,
+                p.fecha_pago,
+                p.metodo_pago,
+                p.notas,
+                p.created_at,
+                p.updated_at
+            FROM usuarios u
+            LEFT JOIN pagos_quiniela p
+                ON p.usuario_id = u.id
+                AND p.torneo_id = $1
+                AND p.jornada_id IS NULL
+            WHERE u.rol = 'jugador'
+            ORDER BY COALESCE(p.pagado, false) ASC, u.nombre ASC
+        `, [torneoId]);
 
         return res.json(resultado.rows);
 
@@ -48,13 +87,7 @@ const guardarPago = async (req, res) => {
     const usuarioId = Number(req.params.usuarioId);
     const adminId = req.usuario?.id;
 
-    const {
-        monto,
-        pagado,
-        fecha_pago,
-        metodo_pago,
-        notas
-    } = req.body;
+    const { monto, pagado, fecha_pago, metodo_pago, notas } = req.body;
 
     if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
         return res.status(400).json({ mensaje: "ID de usuario inválido" });
@@ -71,6 +104,7 @@ const guardarPago = async (req, res) => {
 
     try {
         const torneoId = await resolverTorneoId(req.body.torneo_id);
+        const jornadaId = req.body.jornada_id ? Number(req.body.jornada_id) : null;
 
         const usuario = await pool.query(
             `SELECT id FROM usuarios WHERE id = $1 AND rol = 'jugador'`,
@@ -82,41 +116,47 @@ const guardarPago = async (req, res) => {
 
         const fechaPagoFinal = pagado ? fecha_pago || new Date() : null;
 
+        if (jornadaId) {
+            // Pago por jornada (torneo tipo='jornada')
+            const resultado = await pool.query(
+                `INSERT INTO pagos_quiniela
+                    (usuario_id, torneo_id, jornada_id, monto, pagado, fecha_pago, metodo_pago, notas, registrado_por)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 ON CONFLICT (usuario_id, jornada_id) WHERE jornada_id IS NOT NULL
+                 DO UPDATE SET
+                     monto          = EXCLUDED.monto,
+                     pagado         = EXCLUDED.pagado,
+                     fecha_pago     = EXCLUDED.fecha_pago,
+                     metodo_pago    = EXCLUDED.metodo_pago,
+                     notas          = EXCLUDED.notas,
+                     registrado_por = EXCLUDED.registrado_por,
+                     updated_at     = NOW()
+                 RETURNING id, usuario_id, monto, pagado, fecha_pago, metodo_pago, notas, torneo_id, jornada_id, updated_at`,
+                [usuarioId, torneoId, jornadaId, montoNumero, pagado, fechaPagoFinal, metodo_pago || null, notas || null, adminId]
+            );
+
+            return res.json({
+                mensaje: "Pago actualizado correctamente",
+                pago: resultado.rows[0]
+            });
+        }
+
+        // Pago por torneo (tipo='temporada')
         const resultado = await pool.query(
-            `INSERT INTO pagos_quiniela (
-        usuario_id,
-        monto,
-        pagado,
-        fecha_pago,
-        metodo_pago,
-        notas,
-        registrado_por,
-        torneo_id
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-
-      ON CONFLICT (usuario_id, torneo_id)
-      DO UPDATE SET
-        monto = EXCLUDED.monto,
-        pagado = EXCLUDED.pagado,
-        fecha_pago = EXCLUDED.fecha_pago,
-        metodo_pago = EXCLUDED.metodo_pago,
-        notas = EXCLUDED.notas,
-        registrado_por = EXCLUDED.registrado_por,
-        updated_at = NOW()
-
-      RETURNING
-        id, usuario_id, monto, pagado, fecha_pago, metodo_pago, notas, torneo_id, updated_at`,
-            [
-                usuarioId,
-                montoNumero,
-                pagado,
-                fechaPagoFinal,
-                metodo_pago || null,
-                notas || null,
-                adminId,
-                torneoId
-            ]
+            `INSERT INTO pagos_quiniela
+                (usuario_id, monto, pagado, fecha_pago, metodo_pago, notas, registrado_por, torneo_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT (usuario_id, torneo_id) WHERE jornada_id IS NULL
+             DO UPDATE SET
+                 monto          = EXCLUDED.monto,
+                 pagado         = EXCLUDED.pagado,
+                 fecha_pago     = EXCLUDED.fecha_pago,
+                 metodo_pago    = EXCLUDED.metodo_pago,
+                 notas          = EXCLUDED.notas,
+                 registrado_por = EXCLUDED.registrado_por,
+                 updated_at     = NOW()
+             RETURNING id, usuario_id, monto, pagado, fecha_pago, metodo_pago, notas, torneo_id, updated_at`,
+            [usuarioId, montoNumero, pagado, fechaPagoFinal, metodo_pago || null, notas || null, adminId, torneoId]
         );
 
         return res.json({
@@ -143,21 +183,53 @@ const obtenerMiPago = async (req, res) => {
     try {
         const torneoId = await resolverTorneoId(req.query.torneo_id);
 
+        const torneoResult = await pool.query(
+            `SELECT tipo FROM torneos WHERE id = $1`,
+            [torneoId]
+        );
+        if (torneoResult.rows.length === 0) {
+            return res.status(404).json({ mensaje: "Torneo no encontrado" });
+        }
+
+        const tipo = torneoResult.rows[0].tipo;
+
+        if (tipo === "jornada") {
+            // Devuelve todos los pagos por jornada del usuario en este torneo
+            const resultado = await pool.query(
+                `SELECT
+                    p.jornada_id,
+                    j.numero AS jornada_numero,
+                    COALESCE(p.monto, 0) AS monto,
+                    COALESCE(p.pagado, false) AS pagado,
+                    p.fecha_pago,
+                    p.metodo_pago,
+                    p.notas
+                FROM pagos_quiniela p
+                JOIN jornadas j ON j.id = p.jornada_id
+                WHERE p.usuario_id = $1 AND p.torneo_id = $2 AND p.jornada_id IS NOT NULL
+                ORDER BY j.numero ASC`,
+                [usuarioId, torneoId]
+            );
+            return res.json(resultado.rows);
+        }
+
+        // tipo = 'temporada'
         const resultado = await pool.query(
             `SELECT
-        u.id AS usuario_id,
-        u.nombre,
-        u.email,
-        COALESCE(p.monto, 0) AS monto,
-        COALESCE(p.pagado, false) AS pagado,
-        p.fecha_pago,
-        p.metodo_pago,
-        p.notas
-      FROM usuarios u
-      LEFT JOIN pagos_quiniela p
-        ON p.usuario_id = u.id
-       AND p.torneo_id = $2
-      WHERE u.id = $1`,
+                u.id AS usuario_id,
+                u.nombre,
+                u.email,
+                COALESCE(p.monto, 0) AS monto,
+                COALESCE(p.pagado, false) AS pagado,
+                p.fecha_pago,
+                p.metodo_pago,
+                p.notas
+            FROM usuarios u
+            LEFT JOIN pagos_quiniela p
+                ON p.usuario_id = u.id
+                AND p.torneo_id = $2
+                AND p.jornada_id IS NULL
+            WHERE u.id = $1`,
             [usuarioId, torneoId]
         );
 
