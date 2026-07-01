@@ -62,7 +62,7 @@ const obtenerTorneoPorId = async (req, res) => {
   }
   try {
     const resultado = await pool.query(
-      `SELECT id, nombre, temporada, estado, activo, fecha_inicio, fecha_fin, created_at
+      `SELECT id, nombre, temporada, tipo, estado, activo, fecha_inicio, fecha_fin, created_at
        FROM torneos WHERE id = $1`,
       [id]
     );
