@@ -28,6 +28,7 @@ const historicoRoutes = require("./routes/historico.routes");
 const usuariosRoutes = require("./routes/usuarios.routes");
 const pagosRoutes = require("./routes/pagos.routes");
 const torneosRoutes = require("./routes/torneos.routes");
+const equiposRoutes = require("./routes/equipos.routes");
 
 // Registrar rutas
 app.use("/partidos", partidosRoutes);
@@ -42,6 +43,7 @@ app.use("/historico", historicoRoutes);
 app.use("/usuarios", usuariosRoutes);
 app.use("/pagos", pagosRoutes);
 app.use("/torneos", torneosRoutes);
+app.use("/equipos", equiposRoutes);
 
 // Ruta base
 app.get("/", (req, res) => {

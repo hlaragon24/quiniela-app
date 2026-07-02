@@ -34,9 +34,17 @@ const obtenerPartidosPorJornada = async (req, res) => {
   try {
     const resultado = await db.query(
       `
-      SELECT 
-        p.*
+      SELECT
+        p.*,
+        el.escudo_url  AS escudo_local,
+        el.abreviacion AS abrev_local,
+        el.color       AS color_local,
+        ev.escudo_url  AS escudo_visitante,
+        ev.abreviacion AS abrev_visitante,
+        ev.color       AS color_visitante
       FROM partidos p
+      LEFT JOIN equipos el ON LOWER(TRIM(el.nombre)) = LOWER(TRIM(p.local))
+      LEFT JOIN equipos ev ON LOWER(TRIM(ev.nombre)) = LOWER(TRIM(p.visitante))
       WHERE p.jornada_id = $1
       ORDER BY p.id
       `,
@@ -307,9 +315,18 @@ const obtenerTodosPartidos = async (req, res) => {
   try {
     const resultado = await db.query(
       `
-      SELECT *
-      FROM partidos
-      ORDER BY jornada_id, id
+      SELECT
+        p.*,
+        el.escudo_url  AS escudo_local,
+        el.abreviacion AS abrev_local,
+        el.color       AS color_local,
+        ev.escudo_url  AS escudo_visitante,
+        ev.abreviacion AS abrev_visitante,
+        ev.color       AS color_visitante
+      FROM partidos p
+      LEFT JOIN equipos el ON LOWER(TRIM(el.nombre)) = LOWER(TRIM(p.local))
+      LEFT JOIN equipos ev ON LOWER(TRIM(ev.nombre)) = LOWER(TRIM(p.visitante))
+      ORDER BY p.jornada_id, p.id
       `
     );
 
