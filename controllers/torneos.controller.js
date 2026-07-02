@@ -268,7 +268,7 @@ const obtenerMisTorneos = async (req, res) => {
 
   try {
     const resultado = await pool.query(
-      `SELECT t.id, t.nombre, t.temporada, t.estado, t.activo, t.fecha_inicio, t.fecha_fin, t.created_at
+      `SELECT t.id, t.nombre, t.temporada, t.tipo, t.estado, t.activo, t.fecha_inicio, t.fecha_fin, t.created_at
        FROM torneos t
        INNER JOIN usuarios_torneos ut ON ut.torneo_id = t.id
        WHERE ut.usuario_id = $1

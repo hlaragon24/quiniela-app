@@ -94,6 +94,27 @@ const guardarPronostico = async (req, res) => {
       }
     }
 
+    // Verificar pago: bloquear solo si existe registro con pagado=false
+    {
+      const pagoQuery = partido.torneo_tipo === "jornada"
+        ? `SELECT pagado FROM pagos_quiniela WHERE usuario_id = $1 AND jornada_id = $2`
+        : `SELECT pagado FROM pagos_quiniela WHERE usuario_id = $1 AND torneo_id = $2 AND jornada_id IS NULL`;
+      const pagoParams = partido.torneo_tipo === "jornada"
+        ? [usuario_id, partido.jornada_id]
+        : [usuario_id, partido.torneo_id];
+
+      const pagoResult = await client.query(pagoQuery, pagoParams);
+      if (pagoResult.rows.length > 0 && !pagoResult.rows[0].pagado) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          mensaje: partido.torneo_tipo === "jornada"
+            ? "Tu pago para esta jornada está pendiente"
+            : "Tu pago para este torneo está pendiente",
+          codigo: "PAGO_PENDIENTE"
+        });
+      }
+    }
+
     if (!partido.fecha_cierre) {
       await client.query("ROLLBACK");
 
@@ -294,6 +315,27 @@ const guardarPronosticosJornada = async (req, res) => {
         await client.query("ROLLBACK");
         return res.status(403).json({
           mensaje: "No estás inscrito en esta jornada"
+        });
+      }
+    }
+
+    // Verificar pago: bloquear solo si existe registro con pagado=false
+    {
+      const pagoQuery = jornada.torneo_tipo === "jornada"
+        ? `SELECT pagado FROM pagos_quiniela WHERE usuario_id = $1 AND jornada_id = $2`
+        : `SELECT pagado FROM pagos_quiniela WHERE usuario_id = $1 AND torneo_id = $2 AND jornada_id IS NULL`;
+      const pagoParams = jornada.torneo_tipo === "jornada"
+        ? [usuario_id, jornadasIds[0]]
+        : [usuario_id, jornada.torneo_id];
+
+      const pagoResult = await client.query(pagoQuery, pagoParams);
+      if (pagoResult.rows.length > 0 && !pagoResult.rows[0].pagado) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          mensaje: jornada.torneo_tipo === "jornada"
+            ? "Tu pago para esta jornada está pendiente"
+            : "Tu pago para este torneo está pendiente",
+          codigo: "PAGO_PENDIENTE"
         });
       }
     }
