@@ -94,24 +94,34 @@ const guardarPronostico = async (req, res) => {
       }
     }
 
-    // Verificar pago: bloquear solo si existe registro con pagado=false
+    // Verificar pago jerárquico: jornada primero, luego torneo
     {
-      const pagoQuery = partido.torneo_tipo === "jornada"
-        ? `SELECT pagado FROM pagos_quiniela WHERE usuario_id = $1 AND jornada_id = $2`
-        : `SELECT pagado FROM pagos_quiniela WHERE usuario_id = $1 AND torneo_id = $2 AND jornada_id IS NULL`;
-      const pagoParams = partido.torneo_tipo === "jornada"
-        ? [usuario_id, partido.jornada_id]
-        : [usuario_id, partido.torneo_id];
-
-      const pagoResult = await client.query(pagoQuery, pagoParams);
-      if (pagoResult.rows.length > 0 && !pagoResult.rows[0].pagado) {
+      // 1. Chequeo por jornada (aplica para cualquier tipo de torneo)
+      const pagoJornada = await client.query(
+        `SELECT pagado FROM pagos_quiniela WHERE usuario_id = $1 AND jornada_id = $2`,
+        [usuario_id, partido.jornada_id]
+      );
+      if (pagoJornada.rows.length > 0 && !pagoJornada.rows[0].pagado) {
         await client.query("ROLLBACK");
         return res.status(403).json({
-          mensaje: partido.torneo_tipo === "jornada"
-            ? "Tu pago para esta jornada está pendiente"
-            : "Tu pago para este torneo está pendiente",
+          mensaje: "Tu pago para esta jornada está pendiente",
           codigo: "PAGO_PENDIENTE"
         });
+      }
+
+      // 2. Chequeo por torneo (solo si no hay pago por jornada y es tipo='temporada')
+      if (partido.torneo_tipo === "temporada" && pagoJornada.rows.length === 0) {
+        const pagoTorneo = await client.query(
+          `SELECT pagado FROM pagos_quiniela WHERE usuario_id = $1 AND torneo_id = $2 AND jornada_id IS NULL`,
+          [usuario_id, partido.torneo_id]
+        );
+        if (pagoTorneo.rows.length > 0 && !pagoTorneo.rows[0].pagado) {
+          await client.query("ROLLBACK");
+          return res.status(403).json({
+            mensaje: "Tu pago para este torneo está pendiente",
+            codigo: "PAGO_PENDIENTE"
+          });
+        }
       }
     }
 

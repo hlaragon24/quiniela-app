@@ -16,53 +16,63 @@ const obtenerPagos = async (req, res) => {
 
         const tipo = torneoResult.rows[0].tipo;
 
-        if (tipo === "jornada") {
-            if (!jornadaId || !Number.isInteger(jornadaId) || jornadaId <= 0) {
-                return res.status(400).json({
-                    mensaje: "Para torneos tipo jornada debes enviar jornada_id como query param"
-                });
+        // Con jornada_id: pagos por jornada específica (funciona para cualquier tipo de torneo)
+        if (jornadaId) {
+            if (!Number.isInteger(jornadaId) || jornadaId <= 0) {
+                return res.status(400).json({ mensaje: "jornada_id inválido" });
             }
 
-            const resultado = await pool.query(`
-                SELECT
-                    u.id AS usuario_id,
-                    u.nombre,
-                    u.email,
-                    p.id AS pago_id,
-                    COALESCE(p.monto, 0) AS monto,
-                    COALESCE(p.pagado, false) AS pagado,
-                    p.fecha_pago,
-                    p.metodo_pago,
-                    p.notas,
-                    p.jornada_id,
-                    p.created_at,
-                    p.updated_at
-                FROM usuarios_jornadas uj
-                JOIN usuarios u ON u.id = uj.usuario_id
-                LEFT JOIN pagos_quiniela p
-                    ON p.usuario_id = u.id
-                    AND p.jornada_id = uj.jornada_id
-                WHERE uj.jornada_id = $1
-                ORDER BY COALESCE(p.pagado, false) ASC, u.nombre ASC
-            `, [jornadaId]);
-
-            return res.json(resultado.rows);
+            if (tipo === "jornada") {
+                // tipo=jornada: solo inscritos en esa jornada via usuarios_jornadas
+                const resultado = await pool.query(`
+                    SELECT
+                        u.id AS usuario_id, u.nombre, u.email,
+                        p.id AS pago_id,
+                        COALESCE(p.monto, 0) AS monto,
+                        COALESCE(p.pagado, false) AS pagado,
+                        p.fecha_pago, p.metodo_pago, p.notas, p.jornada_id
+                    FROM usuarios_jornadas uj
+                    JOIN usuarios u ON u.id = uj.usuario_id
+                    LEFT JOIN pagos_quiniela p
+                        ON p.usuario_id = u.id AND p.jornada_id = uj.jornada_id
+                    WHERE uj.jornada_id = $1
+                    ORDER BY COALESCE(p.pagado, false) ASC, u.nombre ASC
+                `, [jornadaId]);
+                return res.json(resultado.rows);
+            } else {
+                // tipo=temporada + jornada_id: todos los inscritos al torneo con su pago por esta jornada
+                const resultado = await pool.query(`
+                    SELECT
+                        u.id AS usuario_id, u.nombre, u.email,
+                        p.id AS pago_id,
+                        COALESCE(p.monto, 0) AS monto,
+                        COALESCE(p.pagado, false) AS pagado,
+                        p.fecha_pago, p.metodo_pago, p.notas, p.jornada_id
+                    FROM usuarios u
+                    INNER JOIN usuarios_torneos ut ON ut.usuario_id = u.id AND ut.torneo_id = $1
+                    LEFT JOIN pagos_quiniela p
+                        ON p.usuario_id = u.id AND p.jornada_id = $2
+                    WHERE u.rol = 'jugador'
+                    ORDER BY COALESCE(p.pagado, false) ASC, u.nombre ASC
+                `, [torneoId, jornadaId]);
+                return res.json(resultado.rows);
+            }
         }
 
-        // tipo = 'temporada' (comportamiento original)
+        if (tipo === "jornada") {
+            return res.status(400).json({
+                mensaje: "Para torneos tipo jornada debes enviar jornada_id como query param"
+            });
+        }
+
+        // tipo='temporada' sin jornada_id: pago global del torneo
         const resultado = await pool.query(`
             SELECT
-                u.id AS usuario_id,
-                u.nombre,
-                u.email,
+                u.id AS usuario_id, u.nombre, u.email,
                 p.id AS pago_id,
                 COALESCE(p.monto, 0) AS monto,
                 COALESCE(p.pagado, false) AS pagado,
-                p.fecha_pago,
-                p.metodo_pago,
-                p.notas,
-                p.created_at,
-                p.updated_at
+                p.fecha_pago, p.metodo_pago, p.notas
             FROM usuarios u
             LEFT JOIN pagos_quiniela p
                 ON p.usuario_id = u.id
@@ -213,31 +223,37 @@ const obtenerMiPago = async (req, res) => {
             return res.json(resultado.rows);
         }
 
-        // tipo = 'temporada'
-        const resultado = await pool.query(
-            `SELECT
-                u.id AS usuario_id,
-                u.nombre,
-                u.email,
-                COALESCE(p.monto, 0) AS monto,
-                COALESCE(p.pagado, false) AS pagado,
-                p.fecha_pago,
-                p.metodo_pago,
-                p.notas
-            FROM usuarios u
-            LEFT JOIN pagos_quiniela p
-                ON p.usuario_id = u.id
-                AND p.torneo_id = $2
-                AND p.jornada_id IS NULL
-            WHERE u.id = $1`,
-            [usuarioId, torneoId]
-        );
+        // tipo='temporada': pago global del torneo + pagos por jornada si los hay
+        const [resultadoTorneo, resultadoJornadas] = await Promise.all([
+            pool.query(
+                `SELECT COALESCE(p.monto, 0) AS monto, COALESCE(p.pagado, false) AS pagado,
+                        p.fecha_pago, p.metodo_pago, p.notas
+                 FROM usuarios u
+                 LEFT JOIN pagos_quiniela p
+                     ON p.usuario_id = u.id AND p.torneo_id = $2 AND p.jornada_id IS NULL
+                 WHERE u.id = $1`,
+                [usuarioId, torneoId]
+            ),
+            pool.query(
+                `SELECT p.jornada_id, j.numero AS jornada_numero,
+                        COALESCE(p.monto, 0) AS monto, COALESCE(p.pagado, false) AS pagado
+                 FROM pagos_quiniela p
+                 JOIN jornadas j ON j.id = p.jornada_id
+                 WHERE p.usuario_id = $1 AND j.torneo_id = $2 AND p.jornada_id IS NOT NULL
+                 ORDER BY j.numero ASC`,
+                [usuarioId, torneoId]
+            )
+        ]);
+        const resultado = resultadoTorneo;
 
         if (resultado.rows.length === 0) {
             return res.status(404).json({ mensaje: "Usuario no encontrado" });
         }
 
-        return res.json(resultado.rows[0]);
+        return res.json({
+            ...resultado.rows[0],
+            pagos_jornada: resultadoJornadas.rows
+        });
 
     } catch (error) {
         if (error.status) {
