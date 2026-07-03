@@ -240,17 +240,31 @@ const abrirJornada = async (req, res) => {
     try {
         const { numero } = req.params;
         const torneoId = await resolverTorneoId(req.body?.torneo_id || req.query.torneo_id);
+        const { fecha_cierre } = req.body || {};
+
+        if (fecha_cierre !== undefined) {
+            if (isNaN(Date.parse(fecha_cierre))) {
+                return res.status(400).json({ mensaje: "fecha_cierre inválida" });
+            }
+            if (new Date(fecha_cierre) <= new Date()) {
+                return res.status(400).json({ mensaje: "La nueva fecha_cierre debe ser en el futuro" });
+            }
+        }
 
         const resultado = await pool.query(
-            `UPDATE jornadas SET estado = 'abierta' WHERE numero = $1 AND torneo_id = $2 RETURNING id`,
-            [numero, torneoId]
+            `UPDATE jornadas
+             SET estado = 'abierta',
+                 fecha_cierre = CASE WHEN $3::text IS NOT NULL THEN $3::timestamptz ELSE fecha_cierre END
+             WHERE numero = $1 AND torneo_id = $2
+             RETURNING id`,
+            [numero, torneoId, fecha_cierre ?? null]
         );
 
         if (resultado.rowCount === 0) {
             return res.status(404).json({ mensaje: "Jornada no encontrada" });
         }
 
-        res.json({ mensaje: "Jornada abierta correctamente" });
+        res.json({ mensaje: "Jornada reabierta correctamente" });
 
     } catch (error) {
         if (error.status) {
