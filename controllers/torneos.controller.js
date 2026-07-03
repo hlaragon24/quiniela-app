@@ -190,28 +190,22 @@ const activarTorneo = async (req, res) => {
     return res.status(400).json({ mensaje: "ID de torneo inválido" });
   }
 
-  const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-
-    const existe = await client.query(`SELECT id FROM torneos WHERE id = $1`, [id]);
-    if (existe.rows.length === 0) {
-      await client.query("ROLLBACK");
+    const resultado = await pool.query(
+      `UPDATE torneos SET activo = NOT activo WHERE id = $1 RETURNING activo`,
+      [id]
+    );
+    if (resultado.rows.length === 0) {
       return res.status(404).json({ mensaje: "Torneo no encontrado" });
     }
-
-    await client.query(`UPDATE torneos SET activo = false`);
-    await client.query(`UPDATE torneos SET activo = true WHERE id = $1`, [id]);
-
-    await client.query("COMMIT");
-
-    return res.json({ mensaje: "Torneo activado correctamente" });
+    const nuevoEstado = resultado.rows[0].activo;
+    return res.json({
+      mensaje: nuevoEstado ? "Torneo activado correctamente" : "Torneo desactivado correctamente",
+      activo: nuevoEstado
+    });
   } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Error activando torneo:", error);
-    return res.status(500).json({ mensaje: "Error activando torneo" });
-  } finally {
-    client.release();
+    console.error("Error cambiando estado de torneo:", error);
+    return res.status(500).json({ mensaje: "Error cambiando estado de torneo" });
   }
 };
 
