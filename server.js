@@ -9,12 +9,31 @@ if (!FRONTEND_URL) {
   console.warn("⚠️  FRONTEND_URL no está configurada. CORS bloqueará peticiones del navegador.");
 }
 
+// Acepta tanto https://dominio.com como https://www.dominio.com
+const allowedOrigins = (() => {
+  if (!FRONTEND_URL) return [];
+  const base = FRONTEND_URL.replace(/\/$/, "");
+  const withWww = base.includes("://www.")
+    ? base
+    : base.replace("://", "://www.");
+  const withoutWww = base.includes("://www.")
+    ? base.replace("://www.", "://")
+    : base;
+  return [withWww, withoutWww];
+})();
+
 const app = express();
 
 app.use(helmet());
 
 app.use(cors({
-  origin: FRONTEND_URL || false,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Origin not allowed by CORS"));
+    }
+  },
   credentials: true
 }));
 
