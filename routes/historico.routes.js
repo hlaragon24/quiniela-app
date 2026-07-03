@@ -118,12 +118,6 @@ router.get("/jornada/:jornada", async (req, res) => {
 
 
       }
-      console.log(
-        row.local,
-        row.visitante,
-        "comodin:",
-        row.es_comodin
-      );
 
 
       tabla[partidoNombre].pronosticos[row.usuario] = {

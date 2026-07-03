@@ -212,12 +212,17 @@ const cerrarJornada = async (req, res) => {
         const { numero } = req.params;
         const torneoId = await resolverTorneoId(req.body.torneo_id);
 
-        await pool.query(
+        const resultado = await pool.query(
             `UPDATE jornadas
              SET fecha_cierre = NOW(), estado = 'cerrada'
-             WHERE numero = $1 AND torneo_id = $2`,
+             WHERE numero = $1 AND torneo_id = $2
+             RETURNING id`,
             [numero, torneoId]
         );
+
+        if (resultado.rowCount === 0) {
+            return res.status(404).json({ mensaje: "Jornada no encontrada" });
+        }
 
         res.json({ mensaje: "Jornada cerrada correctamente" });
 
@@ -236,10 +241,14 @@ const abrirJornada = async (req, res) => {
         const { numero } = req.params;
         const torneoId = await resolverTorneoId(req.body?.torneo_id || req.query.torneo_id);
 
-        await pool.query(
-            `UPDATE jornadas SET estado = 'abierta' WHERE numero = $1 AND torneo_id = $2`,
+        const resultado = await pool.query(
+            `UPDATE jornadas SET estado = 'abierta' WHERE numero = $1 AND torneo_id = $2 RETURNING id`,
             [numero, torneoId]
         );
+
+        if (resultado.rowCount === 0) {
+            return res.status(404).json({ mensaje: "Jornada no encontrada" });
+        }
 
         res.json({ mensaje: "Jornada abierta correctamente" });
 

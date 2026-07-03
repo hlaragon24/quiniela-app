@@ -399,7 +399,7 @@ const obtenerRankingPorJornada = async (req, res) => {
     // Filtra participantes según el tipo de torneo
     const participantesSubquery = jornada.torneo_tipo === "jornada"
       ? `SELECT usuario_id FROM usuarios_jornadas WHERE jornada_id = $1`
-      : `SELECT usuario_id FROM usuarios_torneos WHERE torneo_id = ${jornada.torneo_id}`;
+      : `SELECT usuario_id FROM usuarios_torneos WHERE torneo_id = $2`;
 
     const resultado = await pool.query(`
       WITH elegibles AS (${participantesSubquery})
@@ -464,7 +464,7 @@ const obtenerRankingPorJornada = async (req, res) => {
 
       GROUP BY u.id, u.nombre
       ORDER BY total DESC, marcadores_exactos DESC, resultados_correctos DESC, u.nombre ASC
-    `, [jornada_id]);
+    `, [jornada_id, jornada.torneo_id]);
 
     return res.json({
       jornada: { id: jornada.id, numero: jornada.numero, estado: jornada.estado },

@@ -2,14 +2,19 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+
+const FRONTEND_URL = process.env.FRONTEND_URL;
+if (!FRONTEND_URL) {
+  console.warn("⚠️  FRONTEND_URL no está configurada. CORS bloqueará peticiones del navegador.");
+}
 
 const app = express();
 
-console.log("🔥 SERVER VERSION NUEVA 🔥");
-console.log("🌐 DATABASE_URL cargada:", !!process.env.DATABASE_URL);
+app.use(helmet());
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*",
+  origin: FRONTEND_URL || false,
   credentials: true
 }));
 
