@@ -4,6 +4,7 @@ const router = express.Router();
 const controller = require("../controllers/pronosticos.controller");
 
 const authMiddleware = require("../middleware/auth.middleware");
+const validarAdmin = require("../middleware/admin.middleware");
 
 router.post(
   "/guardar-jornada",
@@ -28,5 +29,9 @@ router.get(
   authMiddleware,
   controller.obtenerHistoricoGeneralPronosticos
 );
+
+router.get("/admin/jornada/:jornadaId", authMiddleware, validarAdmin, controller.obtenerPronosticosAdmin);
+router.put("/admin/:usuarioId/partido/:partidoId", authMiddleware, validarAdmin, controller.actualizarPronosticoAdmin);
+router.delete("/admin/:usuarioId/partido/:partidoId", authMiddleware, validarAdmin, controller.eliminarPronosticoAdmin);
 
 module.exports = router;

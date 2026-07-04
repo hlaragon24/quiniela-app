@@ -188,6 +188,29 @@ const resetearPasswordUsuario = async (req, res) => {
   }
 };
 
+const editarDatosUsuario = async (req, res) => {
+  const id = Number(req.params.id);
+  const { nombre, email } = req.body;
+  if (!validarId(id)) return res.status(400).json({ mensaje: "ID inválido" });
+  if (!nombre?.trim() && !email?.trim()) return res.status(400).json({ mensaje: "Envía nombre o email" });
+  if (email && !validarEmail(email.trim())) return res.status(400).json({ mensaje: "Email inválido" });
+  try {
+    const resultado = await pool.query(
+      `UPDATE usuarios SET
+         nombre = COALESCE($1, nombre),
+         email  = COALESCE($2, email)
+       WHERE id = $3 RETURNING id, nombre, email`,
+      [nombre?.trim() || null, email?.trim().toLowerCase() || null, id]
+    );
+    if (resultado.rows.length === 0) return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    return res.json({ mensaje: "Usuario actualizado", usuario: resultado.rows[0] });
+  } catch (error) {
+    if (error.code === "23505") return res.status(400).json({ mensaje: "El email ya está en uso" });
+    console.error(error);
+    return res.status(500).json({ mensaje: "Error actualizando usuario" });
+  }
+};
+
 const crearUsuario = async (req, res) => {
   const { nombre, email, password, rol } = req.body;
 
@@ -462,6 +485,7 @@ module.exports = {
   actualizarRolUsuario,
   actualizarEstadoUsuario,
   resetearPasswordUsuario,
+  editarDatosUsuario,
   obtenerPerfilUsuario,
   obtenerTorneosPorUsuario,
   asignarUsuarioATorneo,

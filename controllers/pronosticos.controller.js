@@ -640,10 +640,76 @@ const obtenerHistoricoGeneralPronosticos = async (req, res) => {
   }
 };
 
+const obtenerPronosticosAdmin = async (req, res) => {
+  const jornadaId = Number(req.params.jornadaId);
+  if (!esEnteroPositivo(jornadaId)) return res.status(400).json({ mensaje: "ID de jornada inválido" });
+  try {
+    const resultado = await pool.query(`
+      SELECT
+        u.id AS usuario_id, u.nombre AS jugador,
+        p.id AS partido_id, p.local, p.visitante, p.es_comodin,
+        pr.resultado, pr.marcador_local, pr.marcador_visitante, pr.puntos,
+        pr.updated_at
+      FROM partidos p
+      LEFT JOIN pronosticos pr ON pr.partido_id = p.id
+      LEFT JOIN usuarios u ON u.id = pr.usuario_id
+      WHERE p.jornada_id = $1
+      ORDER BY p.id, u.nombre
+    `, [jornadaId]);
+    return res.json(resultado.rows);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ mensaje: "Error obteniendo pronósticos" });
+  }
+};
+
+const actualizarPronosticoAdmin = async (req, res) => {
+  const usuarioId = Number(req.params.usuarioId);
+  const partidoId = Number(req.params.partidoId);
+  const { resultado, marcador_local, marcador_visitante } = req.body;
+  if (!esEnteroPositivo(usuarioId) || !esEnteroPositivo(partidoId)) return res.status(400).json({ mensaje: "IDs inválidos" });
+  if (!resultadosValidos.includes(resultado)) return res.status(400).json({ mensaje: "Resultado inválido" });
+  try {
+    await pool.query(`
+      INSERT INTO pronosticos (usuario_id, partido_id, resultado, marcador_local, marcador_visitante)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (usuario_id, partido_id) DO UPDATE SET
+        resultado = EXCLUDED.resultado,
+        marcador_local = EXCLUDED.marcador_local,
+        marcador_visitante = EXCLUDED.marcador_visitante,
+        updated_at = NOW()
+    `, [usuarioId, partidoId, resultado, Number(marcador_local ?? 0), Number(marcador_visitante ?? 0)]);
+    return res.json({ mensaje: "Pronóstico actualizado" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ mensaje: "Error actualizando pronóstico" });
+  }
+};
+
+const eliminarPronosticoAdmin = async (req, res) => {
+  const usuarioId = Number(req.params.usuarioId);
+  const partidoId = Number(req.params.partidoId);
+  if (!esEnteroPositivo(usuarioId) || !esEnteroPositivo(partidoId)) return res.status(400).json({ mensaje: "IDs inválidos" });
+  try {
+    const r = await pool.query(
+      `DELETE FROM pronosticos WHERE usuario_id = $1 AND partido_id = $2 RETURNING usuario_id`,
+      [usuarioId, partidoId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ mensaje: "Pronóstico no encontrado" });
+    return res.json({ mensaje: "Pronóstico eliminado" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ mensaje: "Error eliminando pronóstico" });
+  }
+};
+
 module.exports = {
   guardarPronostico,
   obtenerPronosticosUsuario,
   guardarPronosticosJornada,
   obtenerPronosticosUsuarioPorJornada,
-  obtenerHistoricoGeneralPronosticos
+  obtenerHistoricoGeneralPronosticos,
+  obtenerPronosticosAdmin,
+  actualizarPronosticoAdmin,
+  eliminarPronosticoAdmin
 };

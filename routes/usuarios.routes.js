@@ -68,4 +68,6 @@ router.delete(
   controller.removerUsuarioDeTorneo
 );
 
+router.put("/:id", authMiddleware, validarAdmin, controller.editarDatosUsuario);
+
 module.exports = router;

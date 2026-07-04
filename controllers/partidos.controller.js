@@ -8,8 +8,7 @@ const validarDatosPartido = (partido) => {
   if (
     !partido.jornada_id ||
     !partido.local ||
-    !partido.visitante ||
-    !partido.fecha
+    !partido.visitante
   ) {
     return false;
   }
@@ -71,7 +70,6 @@ const crearPartido = async (req, res) => {
     jornada_id,
     local,
     visitante,
-    fecha,
     es_comodin = false
   } = req.body;
 
@@ -91,16 +89,15 @@ const crearPartido = async (req, res) => {
     const resultado = await db.query(
       `
       INSERT INTO partidos
-        (jornada_id, local, visitante, fecha, es_comodin)
+        (jornada_id, local, visitante, es_comodin)
       VALUES
-        ($1, $2, $3, $4, $5)
+        ($1, $2, $3, $4)
       RETURNING *
       `,
       [
         Number(jornada_id),
         local.trim(),
         visitante.trim(),
-        fecha,
         Boolean(es_comodin)
       ]
     );
@@ -135,7 +132,7 @@ const crearPartidosLote = async (req, res) => {
   for (const partido of partidos) {
     if (!validarDatosPartido(partido)) {
       return res.status(400).json({
-        mensaje: "Todos los partidos deben tener jornada_id, local, visitante y fecha"
+        mensaje: "Todos los partidos deben tener jornada_id, local y visitante"
       });
     }
 
@@ -155,15 +152,14 @@ const crearPartidosLote = async (req, res) => {
       await client.query(
         `
         INSERT INTO partidos
-          (jornada_id, local, visitante, fecha, es_comodin)
+          (jornada_id, local, visitante, es_comodin)
         VALUES
-          ($1, $2, $3, $4, $5)
+          ($1, $2, $3, $4)
         `,
         [
           Number(partido.jornada_id),
           partido.local.trim(),
           partido.visitante.trim(),
-          partido.fecha,
           Boolean(partido.es_comodin)
         ]
       );
@@ -200,7 +196,6 @@ const editarPartido = async (req, res) => {
     jornada_id,
     local,
     visitante,
-    fecha,
     es_comodin = false
   } = req.body;
 
@@ -230,16 +225,14 @@ const editarPartido = async (req, res) => {
         jornada_id = $1,
         local = $2,
         visitante = $3,
-        fecha = $4,
-        es_comodin = $5
-      WHERE id = $6
+        es_comodin = $4
+      WHERE id = $5
       RETURNING *
       `,
       [
         Number(jornada_id),
         local.trim(),
         visitante.trim(),
-        fecha,
         Boolean(es_comodin),
         id
       ]
