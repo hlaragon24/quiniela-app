@@ -385,7 +385,7 @@ const guardarPronosticosJornada = async (req, res) => {
 
     return res.json({
       mensaje: "Pronósticos guardados correctamente",
-      jornada_id: jornada.jornada_id,
+      jornada_id: jornadasIds[0],
       total_guardados: pronosticos.length
     });
   } catch (error) {

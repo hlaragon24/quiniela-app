@@ -23,15 +23,15 @@ const validarJornadaAbierta = async (req, res, next) => {
 
         }
 
-        const jornadaNumero = partido.rows[0].jornada_id;
+        const jornadaId = partido.rows[0].jornada_id;
 
         const jornada = await pool.query(
             `
             SELECT fecha_cierre
             FROM jornadas
-            WHERE numero = $1
+            WHERE id = $1
             `,
-            [jornadaNumero]
+            [jornadaId]
         );
 
         if (jornada.rows.length === 0) {
