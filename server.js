@@ -56,6 +56,7 @@ const pagosRoutes = require("./routes/pagos.routes");
 const torneosRoutes = require("./routes/torneos.routes");
 const equiposRoutes = require("./routes/equipos.routes");
 const reglamentoRoutes = require("./routes/reglamento.routes");
+const auditoriaRoutes = require("./routes/auditoria.routes");
 
 // Registrar rutas
 app.use("/partidos", partidosRoutes);
@@ -72,6 +73,7 @@ app.use("/pagos", pagosRoutes);
 app.use("/torneos", torneosRoutes);
 app.use("/equipos", equiposRoutes);
 app.use("/reglamento", reglamentoRoutes);
+app.use("/auditoria", auditoriaRoutes);
 
 // Ruta base
 app.get("/", (req, res) => {

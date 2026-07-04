@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const { resolverTorneoId } = require("../utils/torneo");
+const { registrarAuditoria } = require("../utils/auditoria");
 
 const obtenerPagos = async (req, res) => {
     try {
@@ -145,6 +146,14 @@ const guardarPago = async (req, res) => {
                 [usuarioId, torneoId, jornadaId, montoNumero, pagado, fechaPagoFinal, metodo_pago || null, notas || null, adminId]
             );
 
+            registrarAuditoria(pool, {
+                usuario_id: adminId,
+                accion: "PAGO_ACTUALIZADO",
+                entidad: "pago",
+                entidad_id: usuarioId,
+                detalle: { torneo_id: torneoId, jornada_id: jornadaId, pagado, monto: montoNumero },
+            });
+
             return res.json({
                 mensaje: "Pago actualizado correctamente",
                 pago: resultado.rows[0]
@@ -168,6 +177,14 @@ const guardarPago = async (req, res) => {
              RETURNING id, usuario_id, monto, pagado, fecha_pago, metodo_pago, notas, torneo_id, updated_at`,
             [usuarioId, montoNumero, pagado, fechaPagoFinal, metodo_pago || null, notas || null, adminId, torneoId]
         );
+
+        registrarAuditoria(pool, {
+            usuario_id: adminId,
+            accion: "PAGO_ACTUALIZADO",
+            entidad: "pago",
+            entidad_id: usuarioId,
+            detalle: { torneo_id: torneoId, jornada_id: null, pagado, monto: montoNumero },
+        });
 
         return res.json({
             mensaje: "Pago actualizado correctamente",

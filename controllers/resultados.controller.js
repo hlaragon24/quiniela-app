@@ -1,4 +1,5 @@
 const pool = require("../config/database");
+const { registrarAuditoria } = require("../utils/auditoria");
 
 /*
 ====================================
@@ -91,6 +92,14 @@ const registrarResultado = async (req, res) => {
         await actualizarEstadoJornadaSiFinalizada(client, partido.jornada_id);
 
         await client.query("COMMIT");
+
+        registrarAuditoria(pool, {
+            usuario_id: req.usuario?.id,
+            accion: "RESULTADO_GUARDADO",
+            entidad: "partido",
+            entidad_id: partido_id,
+            detalle: { goles_local: Number(goles_local), goles_visitante: Number(goles_visitante) },
+        });
 
         return res.json({
             mensaje: "Resultado registrado y puntos calculados correctamente"

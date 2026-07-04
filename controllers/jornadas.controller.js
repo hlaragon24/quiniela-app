@@ -1,5 +1,7 @@
 const pool = require("../config/database");
 const { resolverTorneoId } = require("../utils/torneo");
+const { registrarAuditoria } = require("../utils/auditoria");
+const { enviarNotificacionJornada } = require("../utils/email");
 
 
 const obtenerJornadaPorNumero = async (req, res) => {
@@ -211,6 +213,7 @@ const cerrarJornada = async (req, res) => {
     try {
         const { numero } = req.params;
         const torneoId = await resolverTorneoId(req.body.torneo_id);
+        const adminId = req.usuario?.id;
 
         const resultado = await pool.query(
             `UPDATE jornadas
@@ -223,6 +226,18 @@ const cerrarJornada = async (req, res) => {
         if (resultado.rowCount === 0) {
             return res.status(404).json({ mensaje: "Jornada no encontrada" });
         }
+
+        const jornadaId = resultado.rows[0].id;
+
+        registrarAuditoria(pool, {
+            usuario_id: adminId,
+            accion: "JORNADA_CERRADA",
+            entidad: "jornada",
+            entidad_id: jornadaId,
+            detalle: { numero, torneo_id: torneoId },
+        });
+
+        enviarNotificacionJornada(torneoId, "cerrada", numero);
 
         res.json({ mensaje: "Jornada cerrada correctamente" });
 
@@ -263,6 +278,19 @@ const abrirJornada = async (req, res) => {
         if (resultado.rowCount === 0) {
             return res.status(404).json({ mensaje: "Jornada no encontrada" });
         }
+
+        const jornadaId = resultado.rows[0].id;
+        const adminId = req.usuario?.id;
+
+        registrarAuditoria(pool, {
+            usuario_id: adminId,
+            accion: "JORNADA_ABIERTA",
+            entidad: "jornada",
+            entidad_id: jornadaId,
+            detalle: { numero, torneo_id: torneoId, fecha_cierre: fecha_cierre ?? null },
+        });
+
+        enviarNotificacionJornada(torneoId, "abierta", numero, fecha_cierre);
 
         res.json({ mensaje: "Jornada reabierta correctamente" });
 
