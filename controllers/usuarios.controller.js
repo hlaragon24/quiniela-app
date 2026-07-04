@@ -280,47 +280,30 @@ const crearUsuario = async (req, res) => {
 
 const obtenerPerfilUsuario = async (req, res) => {
   const usuarioId = req.usuario.id;
+  const torneoId = req.query.torneo_id ? Number(req.query.torneo_id) : null;
 
   try {
     const usuario = await pool.query(
-      `
-      SELECT
-        id,
-        nombre,
-        email,
-        created_at
-      FROM usuarios
-      WHERE id = $1
-      `,
+      `SELECT id, nombre, email, created_at FROM usuarios WHERE id = $1`,
       [usuarioId]
     );
 
     if (usuario.rows.length === 0) {
-      return res.status(404).json({
-        mensaje: "Usuario no encontrado"
-      });
+      return res.status(404).json({ mensaje: "Usuario no encontrado" });
     }
+
+    const torneoFiltro = torneoId
+      ? `AND j.torneo_id = ${torneoId}`
+      : "";
 
     const estadisticas = await pool.query(
       `
       SELECT
         COUNT(pr.id) AS pronosticos_realizados,
 
-        COALESCE(SUM(
-          CASE
-            WHEN pr.puntos > 0
-            THEN 1
-            ELSE 0
-          END
-        ),0) AS aciertos,
+        COALESCE(SUM(CASE WHEN pr.puntos > 0 THEN 1 ELSE 0 END), 0) AS aciertos,
 
-        COALESCE(SUM(
-          CASE
-            WHEN pr.puntos >= 2
-            THEN 1
-            ELSE 0
-          END
-        ),0) AS marcadores_exactos,
+        COALESCE(SUM(CASE WHEN pr.puntos >= 2 THEN 1 ELSE 0 END), 0) AS marcadores_exactos,
 
         COALESCE(SUM(pr.puntos), 0) AS puntos_totales,
 
@@ -328,7 +311,9 @@ const obtenerPerfilUsuario = async (req, res) => {
 
       FROM pronosticos pr
       JOIN partidos p ON p.id = pr.partido_id
+      JOIN jornadas j ON j.id = p.jornada_id
       WHERE pr.usuario_id = $1
+      ${torneoFiltro}
       `,
       [usuarioId]
     );
@@ -352,10 +337,44 @@ const obtenerPerfilUsuario = async (req, res) => {
 
   } catch (error) {
     console.error(error);
+    return res.status(500).json({ mensaje: "Error obteniendo perfil" });
+  }
+};
 
-    return res.status(500).json({
-      mensaje: "Error obteniendo perfil"
-    });
+const cambiarMiPassword = async (req, res) => {
+  const usuarioId = req.usuario.id;
+  const { passwordActual, passwordNuevo } = req.body;
+
+  if (!passwordActual || !passwordNuevo) {
+    return res.status(400).json({ mensaje: "Debes enviar la contraseña actual y la nueva" });
+  }
+
+  if (passwordNuevo.length < 6) {
+    return res.status(400).json({ mensaje: "La nueva contraseña debe tener al menos 6 caracteres" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT password FROM usuarios WHERE id = $1`,
+      [usuarioId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    }
+
+    const esValida = await bcrypt.compare(passwordActual, result.rows[0].password);
+    if (!esValida) {
+      return res.status(401).json({ mensaje: "La contraseña actual no es correcta" });
+    }
+
+    const hash = await bcrypt.hash(passwordNuevo, 10);
+    await pool.query(`UPDATE usuarios SET password = $1 WHERE id = $2`, [hash, usuarioId]);
+
+    return res.json({ mensaje: "Contraseña actualizada correctamente" });
+  } catch (error) {
+    console.error("Error cambiando contraseña:", error);
+    return res.status(500).json({ mensaje: "Error actualizando contraseña" });
   }
 };
 
@@ -487,6 +506,7 @@ module.exports = {
   resetearPasswordUsuario,
   editarDatosUsuario,
   obtenerPerfilUsuario,
+  cambiarMiPassword,
   obtenerTorneosPorUsuario,
   asignarUsuarioATorneo,
   removerUsuarioDeTorneo

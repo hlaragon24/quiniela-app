@@ -237,8 +237,12 @@ const obtenerHistorialRanking = async (req, res) => {
         j.numero AS jornada_numero,
         COALESCE(SUM(pr.puntos), 0) AS puntos
       FROM usuarios u
+      INNER JOIN usuarios_torneos ut
+        ON ut.usuario_id = u.id
+       AND ut.torneo_id = $1
 
-      CROSS JOIN jornadas j
+      INNER JOIN jornadas j
+        ON j.torneo_id = $1
 
       LEFT JOIN partidos p
         ON p.jornada_id = j.id
@@ -246,8 +250,6 @@ const obtenerHistorialRanking = async (req, res) => {
       LEFT JOIN pronosticos pr
         ON pr.usuario_id = u.id
        AND pr.partido_id = p.id
-
-      WHERE j.torneo_id = $1
 
       GROUP BY
         u.id,

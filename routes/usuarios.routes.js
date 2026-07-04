@@ -70,4 +70,6 @@ router.delete(
 
 router.put("/:id", authMiddleware, validarAdmin, controller.editarDatosUsuario);
 
+router.patch("/mi-password", authMiddleware, controller.cambiarMiPassword);
+
 module.exports = router;
