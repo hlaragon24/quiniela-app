@@ -110,7 +110,8 @@ const crearPartido = async (req, res) => {
     console.error("Error crearPartido:", error);
 
     return res.status(500).json({
-      mensaje: "Error al crear partido"
+      mensaje: "Error al crear partido",
+      detalle: error.message
     });
   }
 };
