@@ -367,14 +367,26 @@ const actualizarConfigCampeon = async (req, res) => {
   try {
     const torneoId = await resolverTorneoId(req.body.torneo_id);
 
-    const resultado = await pool.query(
-      `INSERT INTO campeon_config (torneo_id, fecha_cierre)
-       VALUES ($1, $2)
-       ON CONFLICT (torneo_id)
-       DO UPDATE SET fecha_cierre = EXCLUDED.fecha_cierre, updated_at = NOW()
-       RETURNING id, torneo_id, fecha_cierre, updated_at`,
-      [torneoId, fecha_cierre]
+    const existe = await pool.query(
+      `SELECT id FROM campeon_config WHERE torneo_id = $1`,
+      [torneoId]
     );
+
+    let resultado;
+    if (existe.rows.length > 0) {
+      resultado = await pool.query(
+        `UPDATE campeon_config SET fecha_cierre = $1 WHERE torneo_id = $2
+         RETURNING id, torneo_id, fecha_cierre`,
+        [fecha_cierre, torneoId]
+      );
+    } else {
+      resultado = await pool.query(
+        `INSERT INTO campeon_config (torneo_id, fecha_cierre)
+         VALUES ($1, $2)
+         RETURNING id, torneo_id, fecha_cierre`,
+        [torneoId, fecha_cierre]
+      );
+    }
 
     return res.json({
       mensaje: "Fecha de cierre de campeón actualizada correctamente",
@@ -386,7 +398,7 @@ const actualizarConfigCampeon = async (req, res) => {
       return res.status(error.status).json({ mensaje: error.mensaje });
     }
     console.error("Error actualizando configuración de campeón:", error);
-    return res.status(500).json({ mensaje: "Error actualizando configuración de campeón", detalle: error.message });
+    return res.status(500).json({ mensaje: "Error actualizando configuración de campeón" });
   }
 };
 
