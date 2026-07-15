@@ -367,6 +367,12 @@ const actualizarConfigCampeon = async (req, res) => {
   try {
     const torneoId = await resolverTorneoId(req.body.torneo_id);
 
+    // Verificar estructura real de la tabla
+    const cols = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'campeon_config' ORDER BY ordinal_position`
+    );
+    const columnas = cols.rows.map(r => r.column_name);
+
     const existe = await pool.query(
       `SELECT id FROM campeon_config WHERE torneo_id = $1`,
       [torneoId]
@@ -391,7 +397,8 @@ const actualizarConfigCampeon = async (req, res) => {
 
     return res.json({
       mensaje: "Fecha de cierre de campeón actualizada correctamente",
-      config: resultado.rows[0]
+      config: resultado.rows[0],
+      debug: { columnas, filas: existe.rows.length }
     });
 
   } catch (error) {
@@ -399,7 +406,7 @@ const actualizarConfigCampeon = async (req, res) => {
       return res.status(error.status).json({ mensaje: error.mensaje });
     }
     console.error("Error actualizando configuración de campeón:", error);
-    return res.status(500).json({ mensaje: "Error actualizando configuración de campeón" });
+    return res.status(500).json({ mensaje: "Error actualizando configuración de campeón", detalle: error.message });
   }
 };
 
