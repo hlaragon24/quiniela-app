@@ -66,7 +66,7 @@ const obtenerPagos = async (req, res) => {
             });
         }
 
-        // tipo='temporada' sin jornada_id: pago global del torneo
+        // tipo='temporada' sin jornada_id: pago global del torneo (solo usuarios inscritos)
         const resultado = await pool.query(`
             SELECT
                 u.id AS usuario_id, u.nombre, u.email,
@@ -75,6 +75,7 @@ const obtenerPagos = async (req, res) => {
                 COALESCE(p.pagado, false) AS pagado,
                 p.fecha_pago, p.metodo_pago, p.notas
             FROM usuarios u
+            INNER JOIN usuarios_torneos ut ON ut.usuario_id = u.id AND ut.torneo_id = $1
             LEFT JOIN pagos_quiniela p
                 ON p.usuario_id = u.id
                 AND p.torneo_id = $1
