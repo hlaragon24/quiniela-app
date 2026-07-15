@@ -398,7 +398,7 @@ const actualizarConfigCampeon = async (req, res) => {
       return res.status(error.status).json({ mensaje: error.mensaje });
     }
     console.error("Error actualizando configuración de campeón:", error);
-    return res.status(500).json({ mensaje: "Error actualizando configuración de campeón" });
+    return res.status(500).json({ mensaje: "Error actualizando configuración de campeón", detalle: error.message });
   }
 };
 
