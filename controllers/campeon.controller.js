@@ -381,8 +381,9 @@ const actualizarConfigCampeon = async (req, res) => {
       );
     } else {
       resultado = await pool.query(
-        `INSERT INTO campeon_config (torneo_id, fecha_cierre)
-         VALUES ($1, $2)
+        `INSERT INTO campeon_config (id, torneo_id, fecha_cierre)
+         OVERRIDING SYSTEM VALUE
+         VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM campeon_config), $1, $2)
          RETURNING id, torneo_id, fecha_cierre`,
         [torneoId, fecha_cierre]
       );
@@ -398,7 +399,7 @@ const actualizarConfigCampeon = async (req, res) => {
       return res.status(error.status).json({ mensaje: error.mensaje });
     }
     console.error("Error actualizando configuración de campeón:", error);
-    return res.status(500).json({ mensaje: "Error actualizando configuración de campeón", detalle: error.message });
+    return res.status(500).json({ mensaje: "Error actualizando configuración de campeón" });
   }
 };
 
