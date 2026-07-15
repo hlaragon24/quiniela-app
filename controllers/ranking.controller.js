@@ -33,7 +33,8 @@ const obtenerRankingGeneralBase = `
 
       COALESCE(SUM(
         CASE
-          WHEN r.partido_id IS NOT NULL
+          WHEN j.id IS NOT NULL
+           AND r.partido_id IS NOT NULL
            AND pr.resultado =
             CASE
               WHEN r.goles_local > r.goles_visitante THEN 'L'
@@ -47,7 +48,8 @@ const obtenerRankingGeneralBase = `
 
       COALESCE(SUM(
         CASE
-          WHEN r.partido_id IS NOT NULL
+          WHEN j.id IS NOT NULL
+           AND r.partido_id IS NOT NULL
            AND pr.marcador_local = r.goles_local
            AND pr.marcador_visitante = r.goles_visitante
           THEN 2
@@ -57,7 +59,8 @@ const obtenerRankingGeneralBase = `
 
       COALESCE(SUM(
         CASE
-          WHEN r.partido_id IS NOT NULL
+          WHEN j.id IS NOT NULL
+           AND r.partido_id IS NOT NULL
            AND p.es_comodin = true
            AND pr.resultado =
             CASE
@@ -70,7 +73,8 @@ const obtenerRankingGeneralBase = `
         END
         +
         CASE
-          WHEN r.partido_id IS NOT NULL
+          WHEN j.id IS NOT NULL
+           AND r.partido_id IS NOT NULL
            AND p.es_comodin = true
            AND pr.marcador_local = r.goles_local
            AND pr.marcador_visitante = r.goles_visitante
@@ -79,18 +83,21 @@ const obtenerRankingGeneralBase = `
         END
       ), 0) AS puntos_comodin,
 
-      COUNT(pr.id) AS pronosticos_realizados,
+      COUNT(CASE WHEN j.id IS NOT NULL THEN pr.id ELSE NULL END) AS pronosticos_realizados,
 
       COALESCE(SUM(
         CASE
-          WHEN pr.puntos > 0 THEN 1
+          WHEN j.id IS NOT NULL
+           AND pr.puntos > 0
+          THEN 1
           ELSE 0
         END
       ), 0) AS aciertos,
 
       COALESCE(SUM(
         CASE
-          WHEN r.partido_id IS NOT NULL
+          WHEN j.id IS NOT NULL
+           AND r.partido_id IS NOT NULL
            AND pr.marcador_local = r.goles_local
            AND pr.marcador_visitante = r.goles_visitante
           THEN 1
@@ -100,7 +107,8 @@ const obtenerRankingGeneralBase = `
 
       COALESCE(SUM(
         CASE
-          WHEN r.partido_id IS NOT NULL
+          WHEN j.id IS NOT NULL
+           AND r.partido_id IS NOT NULL
            AND pr.resultado =
             CASE
               WHEN r.goles_local > r.goles_visitante THEN 'L'
