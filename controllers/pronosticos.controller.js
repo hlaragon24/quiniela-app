@@ -703,6 +703,82 @@ const eliminarPronosticoAdmin = async (req, res) => {
   }
 };
 
+const obtenerParticipacionJornada = async (req, res) => {
+  const jornadaId = Number(req.params.jornadaId);
+  if (!esEnteroPositivo(jornadaId)) return res.status(400).json({ mensaje: "ID de jornada inválido" });
+
+  try {
+    const jornadaRes = await pool.query(`
+      SELECT j.id, j.torneo_id, t.tipo AS torneo_tipo,
+             COUNT(p.id) AS total_partidos
+      FROM jornadas j
+      JOIN torneos t ON t.id = j.torneo_id
+      LEFT JOIN partidos p ON p.jornada_id = j.id
+      WHERE j.id = $1
+      GROUP BY j.id, j.torneo_id, t.tipo
+    `, [jornadaId]);
+
+    if (!jornadaRes.rows.length) return res.status(404).json({ mensaje: "Jornada no encontrada" });
+
+    const { torneo_id, torneo_tipo, total_partidos } = jornadaRes.rows[0];
+    const totalPartidosNum = Number(total_partidos);
+
+    let jugadoresRes;
+    if (torneo_tipo === "jornada") {
+      jugadoresRes = await pool.query(`
+        SELECT u.id, u.nombre
+        FROM usuarios u
+        JOIN usuarios_jornadas uj ON uj.usuario_id = u.id AND uj.jornada_id = $1
+        WHERE u.activo = true
+        ORDER BY u.nombre
+      `, [jornadaId]);
+    } else {
+      jugadoresRes = await pool.query(`
+        SELECT u.id, u.nombre
+        FROM usuarios u
+        JOIN usuarios_torneos ut ON ut.usuario_id = u.id AND ut.torneo_id = $1
+        WHERE u.activo = true AND u.rol != 'admin'
+        ORDER BY u.nombre
+      `, [torneo_id]);
+    }
+
+    const pronosticosRes = await pool.query(`
+      SELECT pr.usuario_id, COUNT(pr.partido_id) AS total
+      FROM pronosticos pr
+      JOIN partidos p ON p.id = pr.partido_id
+      WHERE p.jornada_id = $1
+      GROUP BY pr.usuario_id
+    `, [jornadaId]);
+
+    const pronosticosMap = {};
+    pronosticosRes.rows.forEach(r => { pronosticosMap[r.usuario_id] = Number(r.total); });
+
+    const jugadores = jugadoresRes.rows.map(j => ({
+      usuario_id: j.id,
+      nombre: j.nombre,
+      pronosticos_enviados: pronosticosMap[j.id] || 0,
+      total_partidos: totalPartidosNum,
+      completo: totalPartidosNum > 0 && (pronosticosMap[j.id] || 0) >= totalPartidosNum
+    }));
+
+    jugadores.sort((a, b) => {
+      if (a.completo !== b.completo) return b.completo - a.completo;
+      return a.nombre.localeCompare(b.nombre);
+    });
+
+    return res.json({
+      total_jugadores: jugadores.length,
+      completaron: jugadores.filter(j => j.completo).length,
+      pendientes: jugadores.filter(j => !j.completo).length,
+      total_partidos: totalPartidosNum,
+      jugadores
+    });
+  } catch (error) {
+    console.error("Error obteniendo participación:", error);
+    return res.status(500).json({ mensaje: "Error obteniendo participación" });
+  }
+};
+
 module.exports = {
   guardarPronostico,
   obtenerPronosticosUsuario,
@@ -711,5 +787,6 @@ module.exports = {
   obtenerHistoricoGeneralPronosticos,
   obtenerPronosticosAdmin,
   actualizarPronosticoAdmin,
-  eliminarPronosticoAdmin
+  eliminarPronosticoAdmin,
+  obtenerParticipacionJornada
 };

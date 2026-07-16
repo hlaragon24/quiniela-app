@@ -31,6 +31,7 @@ router.get(
 );
 
 router.get("/admin/jornada/:jornadaId", authMiddleware, validarAdmin, controller.obtenerPronosticosAdmin);
+router.get("/admin/jornada/:jornadaId/participacion", authMiddleware, validarAdmin, controller.obtenerParticipacionJornada);
 router.put("/admin/:usuarioId/partido/:partidoId", authMiddleware, validarAdmin, controller.actualizarPronosticoAdmin);
 router.delete("/admin/:usuarioId/partido/:partidoId", authMiddleware, validarAdmin, controller.eliminarPronosticoAdmin);
 
