@@ -5,14 +5,12 @@ const router = express.Router();
 const controller = require("../controllers/resultados.controller");
 
 const authMiddleware = require("../middleware/auth.middleware");
-
-const validarAdmin = require("../middleware/admin.middleware");
-
+const { adminOOrganizadorPorPartido } = require("../middleware/organizer.middleware");
 
 router.post(
   "/:partidoId",
   authMiddleware,
-  validarAdmin,
+  adminOOrganizadorPorPartido,
   controller.registrarResultado
 );
 

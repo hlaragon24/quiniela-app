@@ -255,20 +255,40 @@ Retorna los torneos a los que el jugador ha sido asignado.
 */
 const obtenerMisTorneos = async (req, res) => {
   const usuarioId = req.usuario?.id;
+  const rol = req.usuario?.rol;
 
   if (!usuarioId) {
     return res.status(401).json({ mensaje: "Usuario no autenticado" });
   }
 
   try {
-    const resultado = await pool.query(
-      `SELECT t.id, t.nombre, t.temporada, t.tipo, t.estado, t.activo, t.fecha_inicio, t.fecha_fin, t.created_at
-       FROM torneos t
-       INNER JOIN usuarios_torneos ut ON ut.torneo_id = t.id
-       WHERE ut.usuario_id = $1
-       ORDER BY t.id DESC`,
-      [usuarioId]
-    );
+    let resultado;
+
+    if (rol === "admin") {
+      resultado = await pool.query(
+        `SELECT id, nombre, temporada, tipo, estado, activo, fecha_inicio, fecha_fin, created_at
+         FROM torneos ORDER BY id DESC`
+      );
+    } else if (rol === "organizer") {
+      resultado = await pool.query(
+        `SELECT t.id, t.nombre, t.temporada, t.tipo, t.estado, t.activo, t.fecha_inicio, t.fecha_fin, t.created_at
+         FROM torneos t
+         INNER JOIN torneos_organizadores torg ON torg.torneo_id = t.id
+         WHERE torg.usuario_id = $1
+         ORDER BY t.id DESC`,
+        [usuarioId]
+      );
+    } else {
+      resultado = await pool.query(
+        `SELECT t.id, t.nombre, t.temporada, t.tipo, t.estado, t.activo, t.fecha_inicio, t.fecha_fin, t.created_at
+         FROM torneos t
+         INNER JOIN usuarios_torneos ut ON ut.torneo_id = t.id
+         WHERE ut.usuario_id = $1
+         ORDER BY t.id DESC`,
+        [usuarioId]
+      );
+    }
+
     return res.json(resultado.rows);
   } catch (error) {
     console.error("Error obteniendo mis torneos:", error);

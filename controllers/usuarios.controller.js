@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const pool = require("../config/database");
 
-const rolesValidos = ["admin", "jugador"];
+const rolesValidos = ["admin", "jugador", "organizer"];
 
 const validarId = (id) => {
   return !isNaN(id) && Number.isInteger(id) && id > 0;

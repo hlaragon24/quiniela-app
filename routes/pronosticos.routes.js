@@ -5,6 +5,7 @@ const controller = require("../controllers/pronosticos.controller");
 
 const authMiddleware = require("../middleware/auth.middleware");
 const validarAdmin = require("../middleware/admin.middleware");
+const { adminOOrganizadorPorJornada } = require("../middleware/organizer.middleware");
 
 router.post(
   "/guardar-jornada",
@@ -30,8 +31,8 @@ router.get(
   controller.obtenerHistoricoGeneralPronosticos
 );
 
-router.get("/admin/jornada/:jornadaId", authMiddleware, validarAdmin, controller.obtenerPronosticosAdmin);
-router.get("/admin/jornada/:jornadaId/participacion", authMiddleware, validarAdmin, controller.obtenerParticipacionJornada);
+router.get("/admin/jornada/:jornadaId", authMiddleware, adminOOrganizadorPorJornada, controller.obtenerPronosticosAdmin);
+router.get("/admin/jornada/:jornadaId/participacion", authMiddleware, adminOOrganizadorPorJornada, controller.obtenerParticipacionJornada);
 router.put("/admin/:usuarioId/partido/:partidoId", authMiddleware, validarAdmin, controller.actualizarPronosticoAdmin);
 router.delete("/admin/:usuarioId/partido/:partidoId", authMiddleware, validarAdmin, controller.eliminarPronosticoAdmin);
 
