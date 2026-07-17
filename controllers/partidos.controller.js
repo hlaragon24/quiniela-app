@@ -40,10 +40,13 @@ const obtenerPartidosPorJornada = async (req, res) => {
         el.color       AS color_local,
         ev.escudo_url  AS escudo_visitante,
         ev.abreviacion AS abrev_visitante,
-        ev.color       AS color_visitante
+        ev.color       AS color_visitante,
+        r.goles_local,
+        r.goles_visitante
       FROM partidos p
       LEFT JOIN equipos el ON LOWER(TRIM(el.nombre)) = LOWER(TRIM(p.local))
       LEFT JOIN equipos ev ON LOWER(TRIM(ev.nombre)) = LOWER(TRIM(p.visitante))
+      LEFT JOIN resultados r ON r.partido_id = p.id
       WHERE p.jornada_id = $1
       ORDER BY p.id
       `,
