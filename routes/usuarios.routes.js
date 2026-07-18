@@ -73,6 +73,6 @@ router.put("/:id", authMiddleware, validarAdmin, controller.editarDatosUsuario);
 router.patch("/mi-password", authMiddleware, controller.cambiarMiPassword);
 
 router.patch("/ping", authMiddleware, controller.pingActivo);
-router.get("/activos", authMiddleware, validarAdmin, controller.obtenerActivos);
+router.get("/activos", authMiddleware, controller.obtenerActivos);
 
 module.exports = router;
