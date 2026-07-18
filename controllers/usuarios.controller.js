@@ -498,6 +498,53 @@ const removerUsuarioDeTorneo = async (req, res) => {
   }
 };
 
+// ── Sesiones activas ─────────────────────────────────────────────────────────
+
+let _sessionTableReady = false;
+const ensureSessionTable = async () => {
+  if (_sessionTableReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sesiones_activas (
+      usuario_id INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+      ultimo_visto TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  _sessionTableReady = true;
+};
+
+const pingActivo = async (req, res) => {
+  try {
+    await ensureSessionTable();
+    await pool.query(
+      `INSERT INTO sesiones_activas (usuario_id, ultimo_visto)
+       VALUES ($1, NOW())
+       ON CONFLICT (usuario_id) DO UPDATE SET ultimo_visto = NOW()`,
+      [req.usuario.id]
+    );
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Error ping activo:", error);
+    return res.status(500).json({ mensaje: "Error" });
+  }
+};
+
+const obtenerActivos = async (req, res) => {
+  try {
+    await ensureSessionTable();
+    const result = await pool.query(`
+      SELECT s.usuario_id AS id, u.nombre, s.ultimo_visto
+      FROM sesiones_activas s
+      JOIN usuarios u ON u.id = s.usuario_id
+      WHERE s.ultimo_visto > NOW() - INTERVAL '5 minutes'
+      ORDER BY u.nombre ASC
+    `);
+    return res.json(result.rows);
+  } catch (error) {
+    console.error("Error obtenerActivos:", error);
+    return res.status(500).json({ mensaje: "Error" });
+  }
+};
+
 module.exports = {
   obtenerUsuarios,
   crearUsuario,
@@ -509,5 +556,7 @@ module.exports = {
   cambiarMiPassword,
   obtenerTorneosPorUsuario,
   asignarUsuarioATorneo,
-  removerUsuarioDeTorneo
+  removerUsuarioDeTorneo,
+  pingActivo,
+  obtenerActivos
 };
