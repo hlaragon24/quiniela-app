@@ -543,6 +543,11 @@ const obtenerHistoricoGeneralPronosticos = async (req, res) => {
         p.visitante,
         p.es_comodin,
 
+        el.escudo_url AS escudo_local,
+        el.color      AS color_local,
+        ev.escudo_url AS escudo_visitante,
+        ev.color      AS color_visitante,
+
         pr.resultado AS pronostico_resultado,
         pr.marcador_local AS pronostico_local,
         pr.marcador_visitante AS pronostico_visitante,
@@ -612,6 +617,9 @@ const obtenerHistoricoGeneralPronosticos = async (req, res) => {
 
       INNER JOIN partidos p
         ON p.id = pr.partido_id
+
+      LEFT JOIN equipos el ON LOWER(TRIM(el.nombre)) = LOWER(TRIM(p.local))
+      LEFT JOIN equipos ev ON LOWER(TRIM(ev.nombre)) = LOWER(TRIM(p.visitante))
 
       INNER JOIN jornadas j
         ON j.id = p.jornada_id
