@@ -35,6 +35,7 @@ const obtenerRankingGeneralBase = `
         CASE
           WHEN j.id IS NOT NULL
            AND r.partido_id IS NOT NULL
+           AND (p.es_comodin IS NULL OR p.es_comodin = false)
            AND pr.resultado =
             CASE
               WHEN r.goles_local > r.goles_visitante THEN 'L'
@@ -50,6 +51,7 @@ const obtenerRankingGeneralBase = `
         CASE
           WHEN j.id IS NOT NULL
            AND r.partido_id IS NOT NULL
+           AND (p.es_comodin IS NULL OR p.es_comodin = false)
            AND pr.marcador_local = r.goles_local
            AND pr.marcador_visitante = r.goles_visitante
           THEN 2
@@ -62,23 +64,7 @@ const obtenerRankingGeneralBase = `
           WHEN j.id IS NOT NULL
            AND r.partido_id IS NOT NULL
            AND p.es_comodin = true
-           AND pr.resultado =
-            CASE
-              WHEN r.goles_local > r.goles_visitante THEN 'L'
-              WHEN r.goles_visitante > r.goles_local THEN 'V'
-              ELSE 'E'
-            END
-          THEN 1
-          ELSE 0
-        END
-        +
-        CASE
-          WHEN j.id IS NOT NULL
-           AND r.partido_id IS NOT NULL
-           AND p.es_comodin = true
-           AND pr.marcador_local = r.goles_local
-           AND pr.marcador_visitante = r.goles_visitante
-          THEN 1
+          THEN COALESCE(pr.puntos, 0)
           ELSE 0
         END
       ), 0) AS puntos_comodin,
