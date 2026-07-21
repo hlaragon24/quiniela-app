@@ -292,10 +292,6 @@ const obtenerPerfilUsuario = async (req, res) => {
       return res.status(404).json({ mensaje: "Usuario no encontrado" });
     }
 
-    const torneoFiltro = torneoId
-      ? `AND j.torneo_id = ${torneoId}`
-      : "";
-
     const estadisticas = await pool.query(
       `
       SELECT
@@ -313,9 +309,9 @@ const obtenerPerfilUsuario = async (req, res) => {
       JOIN partidos p ON p.id = pr.partido_id
       JOIN jornadas j ON j.id = p.jornada_id
       WHERE pr.usuario_id = $1
-      ${torneoFiltro}
+      AND ($2::integer IS NULL OR j.torneo_id = $2)
       `,
-      [usuarioId]
+      [usuarioId, torneoId ? Number(torneoId) : null]
     );
 
     const stats = estadisticas.rows[0];

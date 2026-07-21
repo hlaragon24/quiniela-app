@@ -24,9 +24,19 @@ const allowedOrigins = (() => {
   return [withWww, withoutWww];
 })();
 
+const rateLimit = require("express-rate-limit");
+
 const app = express();
 
 app.use(helmet());
+
+app.use("/auth/login", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { mensaje: "Demasiados intentos, espera 15 minutos" },
+}));
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -89,10 +99,14 @@ app.get("/health", (req, res) => {
 
 // Ruta no encontrada
 app.use((req, res) => {
-  res.status(404).json({
-    error: "Ruta no encontrada"
-  });
+  res.status(404).json({ error: "Ruta no encontrada" });
 });
+
+// Error handler global — captura cualquier excepción no manejada en middlewares
+app.use((err, req, res, next) => {
+  console.error("Error no manejado:", err?.message ?? err);
+  res.status(500).json({ mensaje: "Error interno del servidor" });
+});;
 
 
 const PORT = process.env.PORT || 3000;

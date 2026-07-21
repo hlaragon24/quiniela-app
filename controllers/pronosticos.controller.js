@@ -220,6 +220,12 @@ const guardarPronosticosJornada = async (req, res) => {
     });
   }
 
+  if (pronosticos.length > 50) {
+    return res.status(400).json({
+      mensaje: "El lote no puede contener más de 50 pronósticos"
+    });
+  }
+
   for (const p of pronosticos) {
     if (
       !esEnteroPositivo(p.partido_id) ||

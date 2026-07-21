@@ -84,7 +84,7 @@ const login = async (req, res) => {
     const emailNormalizado = email.trim().toLowerCase();
 
     const resultado = await pool.query(
-      "SELECT * FROM usuarios WHERE email = $1",
+      "SELECT id, nombre, email, rol, activo, password FROM usuarios WHERE email = $1",
       [emailNormalizado]
     );
 
